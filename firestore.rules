@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper to get user document data
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper to check user role
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+
+    // Users Collection rules
+    match /users/{userId} {
+      // Users can read/write their own profile
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Admins can read all users
+      allow read: if hasRole('admin');
+    }
+
+    // Stores Collection rules
+    match /stores/{storeId} {
+      // Anyone can read store info
+      allow read: if true;
+      // Merchants can create/update their own stores, Admin can write to all
+      allow create: if hasRole('merchant') || hasRole('admin');
+      allow update, delete: if hasRole('admin') || (hasRole('merchant') && resource.data.ownerId == request.auth.uid);
+    }
+
+    // Products Collection rules
+    match /products/{productId} {
+      // Anyone can read product details
+      allow read: if true;
+      // Merchants can manage products for their own store, Admin can manage all
+      allow create: if hasRole('admin') || (hasRole('merchant') && request.resource.data.storeId == 'store_' + request.auth.uid);
+      allow update, delete: if hasRole('admin') || (hasRole('merchant') && resource.data.storeId == 'store_' + request.auth.uid);
+    }
+
+    // Orders Collection rules
+    match /orders/{orderId} {
+      // Read constraints:
+      // Customers read their own orders. Couriers read their orders or active search jobs. Merchants read their store's orders.
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.courierId == request.auth.uid ||
+        hasRole('admin') ||
+        (hasRole('merchant') && resource.data.storeId == 'store_' + request.auth.uid) || 
+        resource.data.status == 'searchingCourier' ||
+        resource.data.status == 'readyForPickup'
+      );
+      
+      // Creation constraints: Customers can create orders, Admin can create any
+      allow create: if isAuthenticated() && (request.resource.data.customerId == request.auth.uid || hasRole('admin'));
+      
+      // Update constraints:
+      allow update: if isAuthenticated() && (
+        hasRole('admin') ||
+        (resource.data.customerId == request.auth.uid && request.resource.data.status == 'cancelled' && resource.data.status == 'pending') ||
+        (hasRole('merchant') && resource.data.storeId == 'store_' + request.auth.uid) ||
+        (hasRole('courier') && (
+          // Courier accepting search order
+          (resource.data.status == 'searchingCourier' && request.resource.data.courierId == request.auth.uid) ||
+          // Courier updating order they are assigned to
+          (resource.data.courierId == request.auth.uid)
+        ))
+      );
+
+      // Only admin can delete orders
+      allow delete: if hasRole('admin');
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "548597468179",
+    "project_id": "talabaty-204be",
+    "storage_bucket": "talabaty-204be.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548597468179:android:fec38ac436452fe1b003e6",
+        "android_client_info": {
+          "package_name": "com.talabaty.talabaty_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASfR9hMG_bSltBXPdV9PCXWByZF1D3P2M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
