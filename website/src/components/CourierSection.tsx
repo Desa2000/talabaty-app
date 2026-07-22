@@ -40,18 +40,34 @@ export default function CourierSection() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
             
-            {/* Visual Column — Official Dark Courier Dashboard Visual with ImageReveal */}
-            <div className="lg:col-span-5 order-2 lg:order-1 flex justify-center">
+            {/* Visual Column — Lifestyle Courier Night Scene + Mobile App Dashboard Frame */}
+            <div className="lg:col-span-5 order-2 lg:order-1 flex justify-center relative">
               <ImageReveal delay={0.2} className="w-full max-w-md">
-                <div className="relative rounded-3xl overflow-hidden border border-gray-800 shadow-2xl bg-gray-900">
+                <div className="relative rounded-3xl overflow-hidden border border-gray-800 shadow-2xl bg-gray-900 aspect-[4/3]">
                   <Image
-                    src="/experience/courier/courier-dashboard.webp"
-                    alt="Talabaty Courier Dashboard Visual"
-                    width={1024}
-                    height={576}
-                    className="w-full h-auto object-cover"
+                    src="/experience/courier/courier-night-scene.webp"
+                    alt="Talabaty Courier Night Scene"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 450px"
+                    className="object-cover object-center"
                     priority
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4 bg-gray-900/90 backdrop-blur-md rounded-2xl p-3 border border-gray-700/80 shadow-xl flex items-center gap-3">
+                    <div className="relative w-12 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-950 border border-gray-800">
+                      <Image
+                        src="/experience/courier/courier-dashboard.webp"
+                        alt="Talabaty Courier App UI"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-white">{isRTL ? "تطبيق المندوب" : "Courier App"}</span>
+                      <span className="text-[11px] font-medium text-emerald-400">{isRTL ? "متاح للقيادة والتوصيل" : "Active & Ready"}</span>
+                    </div>
+                  </div>
                 </div>
               </ImageReveal>
             </div>

@@ -13,30 +13,20 @@ export default function FoundersSection() {
     {
       name: isRTL ? "مازن محمد حسن النعيم" : "Mazen Mohamed Hassan Alnaeem",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/mazen-mohamed-hassan-alnaeem.webp",
+      image: "/founders/mazen-mohamed-hassan-alnaeem.jpg",
       objectPos: "object-top",
     },
     {
       name: isRTL ? "المدثر عامر الفاضل" : "Almodther Amer Alfadel",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/almodther-amer-alfadel.webp",
+      image: "/founders/almodther-amer-alfadel.jpg",
       objectPos: "object-top",
     },
   ];
 
   return (
     <section id="founders" className="py-20 lg:py-28 bg-white relative overflow-hidden">
-      
-      {/* Subtle Brand Watermark in Background */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none overflow-hidden">
-        <Image
-          src="/experience/brand/logo.webp"
-          alt="Talabaty Watermark"
-          width={550}
-          height={550}
-          className="object-contain filter grayscale"
-        />
-      </div>
+
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}

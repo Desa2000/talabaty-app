@@ -69,7 +69,7 @@ export default function BenefitsSection() {
               <StaggerChild key={i} className="h-full">
                 <motion.div
                   variants={cardVariants}
-                  className="group h-full bg-[#FAF7F2] rounded-2xl p-6 border border-[#F0EAE1] hover:-translate-y-[3px] hover:border-[#FF5722] hover:bg-white hover:shadow-lg transition-all duration-300 ease-out text-right flex flex-col items-start"
+                  className="group h-full bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/40 shadow-md hover:-translate-y-[3px] hover:border-orange-300 hover:bg-white/90 hover:shadow-xl transition-all duration-300 ease-out text-right flex flex-col items-start"
                 >
                   <div className={`w-12 h-12 rounded-xl ${b.accentBg} ${b.iconColor} flex items-center justify-center mb-4 transition-colors duration-300`}>
                     <Icon className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
