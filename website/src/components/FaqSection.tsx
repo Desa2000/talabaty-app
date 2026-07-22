@@ -63,7 +63,7 @@ export default function FaqSection() {
   ];
 
   return (
-    <section id="faq" className="py-20 bg-[#FAF7F2] border-t border-[#F0EAE1] relative overflow-hidden">
+    <section id="faq" className="py-20 bg-[#FAF7F2] border-t border-[#F0EAE1] relative overflow-hidden scroll-mt-24">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Header */}

@@ -52,7 +52,7 @@ export default function Services() {
   ];
 
   return (
-    <section id="services" className="py-20 lg:py-28 bg-white relative overflow-hidden">
+    <section id="services" className="py-20 lg:py-28 bg-white relative overflow-hidden scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Chapter Header */}

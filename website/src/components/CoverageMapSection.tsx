@@ -10,7 +10,7 @@ export default function CoverageMapSection() {
   const isRTL = lang === "ar";
 
   return (
-    <section id="coverage" className="py-20 lg:py-28 bg-[#FAF7F2] border-y border-[#F0EAE1] relative overflow-hidden">
+    <section id="coverage" className="py-20 lg:py-28 bg-[#FAF7F2] border-y border-[#F0EAE1] relative overflow-hidden scroll-mt-24">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Apple Moment Section Header */}

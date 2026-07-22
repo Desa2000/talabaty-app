@@ -40,10 +40,10 @@ export default function Hero() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none z-0" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
-          {/* Text Content Column (100% Accessible Selectable DOM HTML Overlay) */}
-          <div className="lg:col-span-7 flex flex-col items-start text-right">
+          {/* Text Content Column (RTL Right side - 40% width / 5 cols) */}
+          <div className="lg:col-span-5 flex flex-col items-start text-right">
             
             {/* Eyebrow Label */}
             <FadeUp delay={0.1}>
@@ -52,7 +52,7 @@ export default function Hero() {
 
             {/* Main Headline */}
             <FadeUp delay={0.2}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#1A1D27] tracking-tight leading-[1.15] mb-4">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1A1D27] tracking-tight leading-[1.18] mb-4">
                 <span>{t("heroTitlePrefix")}</span>{" "}
                 <span className="text-[#FF5722] block sm:inline">{t("heroTitleMain")}</span>
               </h1>
@@ -60,44 +60,44 @@ export default function Hero() {
 
             {/* Subtitle & Brand Phrase */}
             <FadeUp delay={0.35}>
-              <p className="text-lg sm:text-xl text-gray-600 font-medium mb-2 max-w-2xl leading-relaxed">
+              <p className="text-base sm:text-lg text-gray-600 font-medium mb-2 max-w-xl leading-relaxed">
                 {t("heroDescription")}
               </p>
-              <p className="text-base sm:text-lg font-bold text-[#FF5722] mb-7">
+              <p className="text-sm sm:text-base font-bold text-[#FF5722] mb-6">
                 {t("brandPhrase")}
               </p>
             </FadeUp>
 
             {/* 3 Small Benefits Icons Below Copy */}
             <FadeUp delay={0.45}>
-              <div className="grid grid-cols-3 gap-3 sm:gap-6 mb-8 w-full max-w-lg">
-                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-orange-100/80 shadow-xs">
-                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF5722] flex items-center justify-center shrink-0">
-                    <Zap className="w-4 h-4" />
+              <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-8 w-full">
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-orange-100/80 shadow-xs">
+                  <div className="w-7 h-7 rounded-lg bg-orange-50 text-[#FF5722] flex items-center justify-center shrink-0">
+                    <Zap className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="block text-xs font-bold text-[#1A1D27]">توصيل سريع</span>
-                    <span className="text-[11px] text-gray-500 font-medium">أقرب ليك</span>
+                    <span className="block text-[11px] font-bold text-[#1A1D27]">توصيل سريع</span>
+                    <span className="text-[10px] text-gray-500 font-medium">أقرب ليك</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-emerald-100/80 shadow-xs">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-emerald-100/80 shadow-xs">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="block text-xs font-bold text-[#1A1D27]">دفع آمن</span>
-                    <span className="text-[11px] text-gray-500 font-medium">وسهل</span>
+                    <span className="block text-[11px] font-bold text-[#1A1D27]">دفع آمن</span>
+                    <span className="text-[10px] text-gray-500 font-medium">وسهل</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-blue-100/80 shadow-xs">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <Headphones className="w-4 h-4" />
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-blue-100/80 shadow-xs">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Headphones className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="block text-xs font-bold text-[#1A1D27]">دعم مباشر</span>
-                    <span className="text-[11px] text-gray-500 font-medium">معاك</span>
+                    <span className="block text-[11px] font-bold text-[#1A1D27]">دعم مباشر</span>
+                    <span className="text-[10px] text-gray-500 font-medium">معاك</span>
                   </div>
                 </div>
               </div>
@@ -105,14 +105,14 @@ export default function Hero() {
 
             {/* Call to Action Buttons */}
             <FadeUp delay={0.55} className="w-full sm:w-auto">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 
                 {/* Primary CTA Button */}
                 <motion.div
                   whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: MOTION_TOKENS.FAST }}
-                  className="relative inline-flex items-center justify-center px-8 py-4 rounded-2xl text-base font-bold text-white bg-[#FF5722] hover:bg-[#E64A19] shadow-lg shadow-orange-500/25 cursor-default select-none pointer-events-auto"
+                  className="relative inline-flex items-center justify-center px-7 py-3.5 rounded-xl text-sm font-bold text-white bg-[#FF5722] hover:bg-[#E64A19] shadow-lg shadow-orange-500/25 cursor-default select-none pointer-events-auto"
                 >
                   <span>{t("downloadApp")}</span>
                 </motion.div>
@@ -126,9 +126,9 @@ export default function Hero() {
                 >
                   <Link
                     href="/merchant"
-                    className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-base font-bold text-[#1A1D27] bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm transition-all"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-[#1A1D27] bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm transition-all"
                   >
-                    <Store className="w-5 h-5 text-[#FF5722]" />
+                    <Store className="w-4 h-4 text-[#FF5722]" />
                     <span>{t("joinMerchant")}</span>
                     <ArrowIcon className="w-4 h-4" />
                   </Link>
@@ -139,20 +139,18 @@ export default function Hero() {
 
           </div>
 
-          {/* Customer App Visual Column (Static Fallback for Mobile / WebGL-Disabled + R3F Canvas Container) */}
-          <div className="lg:col-span-5 relative flex justify-center items-center mt-8 lg:mt-0">
-            <ImageReveal delay={0.65} className="w-full max-w-sm sm:max-w-md">
-              <div className="relative bg-white rounded-[40px] p-3 sm:p-4 border border-orange-100/90 shadow-2xl shadow-orange-950/10 transition-all duration-300 overflow-hidden">
-                <div className="relative w-full aspect-[9/18] rounded-[32px] overflow-hidden bg-[#FAF7F2]">
-                  <Image
-                    src="/experience/hero/customer-phone.webp"
-                    alt="Talabaty Customer App Official Visual"
-                    fill
-                    sizes="(max-width: 768px) 300px, 420px"
-                    className="object-contain object-top"
-                    priority
-                  />
-                </div>
+          {/* Main Hero Visual Column (Left side - 60% width / 7 cols) */}
+          <div className="lg:col-span-7 relative flex justify-center items-center mt-6 lg:mt-0">
+            <ImageReveal delay={0.3} className="w-full">
+              <div className="relative w-full rounded-3xl overflow-hidden border border-orange-100/90 shadow-2xl shadow-orange-950/10 bg-white aspect-[16/7]">
+                <Image
+                  src="/experience/hero/talabaty-hero.webp"
+                  alt="Talabaty Official Hero Visual Scene"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 750px"
+                  className="object-cover object-center"
+                  priority
+                />
               </div>
             </ImageReveal>
           </div>

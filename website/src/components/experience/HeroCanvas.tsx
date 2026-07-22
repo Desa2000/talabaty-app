@@ -10,15 +10,6 @@ import * as THREE from "three";
 // ──────────────────────────────────────────────
 function HeroScene({ scrollProgress }: { scrollProgress: number }) {
   const groupRef = useRef<THREE.Group>(null);
-  const layer1Ref = useRef<THREE.Mesh>(null);
-  const layer2Ref = useRef<THREE.Mesh>(null);
-  const layer3Ref = useRef<THREE.Mesh>(null);
-
-  // Load optimized textures
-  const bgTexture = useTexture("/experience/hero/sudan-city-background.webp");
-  const phoneTexture = useTexture("/experience/hero/customer-phone.webp");
-
-  // Mouse coordinates for subtle parallax
   const mouse = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -35,93 +26,26 @@ function HeroScene({ scrollProgress }: { scrollProgress: number }) {
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
-
-    // High precision time delta for smooth lerping
     const dt = Math.min(delta, 0.1);
-
-    // 1. Mouse Parallax target rotations (Max 0.05 radians)
-    const targetRotY = mouse.current.x * 0.05;
-    const targetRotX = -mouse.current.y * 0.05;
-
-    // Smooth spring interpolation (lerp)
-    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, dt * 5);
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, dt * 5);
-
-    // 2. Multi-depth Parallax Layering for extra Lusion-style depth
-    if (layer1Ref.current) {
-        layer1Ref.current.position.x = THREE.MathUtils.lerp(layer1Ref.current.position.x, mouse.current.x * -0.2, dt * 3);
-        layer1Ref.current.position.y = THREE.MathUtils.lerp(layer1Ref.current.position.y, mouse.current.y * 0.2, dt * 3);
-    }
-    if (layer2Ref.current) {
-        layer2Ref.current.position.x = THREE.MathUtils.lerp(layer2Ref.current.position.x, mouse.current.x * 0.1, dt * 4);
-        layer2Ref.current.position.y = THREE.MathUtils.lerp(layer2Ref.current.position.y, mouse.current.y * -0.1, dt * 4);
-    }
-    if (layer3Ref.current) {
-        layer3Ref.current.position.x = THREE.MathUtils.lerp(layer3Ref.current.position.x, mouse.current.x * 0.3, dt * 5);
-        layer3Ref.current.position.y = THREE.MathUtils.lerp(layer3Ref.current.position.y, mouse.current.y * -0.3, dt * 5);
-    }
-
-    // 3. Scroll-linked camera depth movement
-    // 0% -> 100% scroll shifts camera Z and Group position smoothly
-    const scrollZOffset = scrollProgress * 2.5;
-    const scrollYOffset = scrollProgress * 1.5;
-
-    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, 5 + scrollZOffset, dt * 4);
-    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, -scrollYOffset, dt * 4);
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, mouse.current.x * 0.03, dt * 5);
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -mouse.current.y * 0.03, dt * 5);
   });
 
   return (
     <group ref={groupRef}>
-      
-      {/* Layer 1 (Background Scene): z = -4 */}
-      <mesh ref={layer1Ref} position={[0, 0, -4]}>
-        <planeGeometry args={[12, 12]} />
-        <meshBasicMaterial map={bgTexture} transparent opacity={0.35} depthWrite={false} />
-      </mesh>
-
       {/* Ambient Floating Particles */}
       <Sparkles 
-        count={80} 
+        count={60} 
         scale={10} 
         size={2} 
         speed={0.4} 
-        opacity={0.15} 
-        color="#FF8A65" 
-        position={[0, 0, -3]} 
-      />
-
-      {/* Layer 2 (Atmospheric Radial Glow): z = -2.5 */}
-      <mesh ref={layer2Ref} position={[0, 0, -2.5]}>
-        <planeGeometry args={[8, 8]} />
-        <meshBasicMaterial transparent opacity={0.25} color="#FF5722" depthWrite={false} />
-      </mesh>
-
-      {/* Extra Atmospheric Particles foreground */}
-      <Sparkles 
-        count={40} 
-        scale={6} 
-        size={3} 
-        speed={0.6} 
         opacity={0.2} 
-        color="#FFCCBC" 
-        position={[0, 0, -1]} 
+        color="#FF8A65" 
+        position={[0, 0, -2]} 
       />
-
-      {/* Layer 3 (Customer Phone Visual): z = 0 */}
-      <mesh ref={layer3Ref} position={[0, -0.1, 0]}>
-        <planeGeometry args={[2.2, 3.8]} />
-        <meshBasicMaterial map={phoneTexture} transparent />
-      </mesh>
-
     </group>
   );
 }
-
-// ──────────────────────────────────────────────
-// Preload Textures for instant WebGL render
-// ──────────────────────────────────────────────
-useTexture.preload("/experience/hero/sudan-city-background.webp");
-useTexture.preload("/experience/hero/customer-phone.webp");
 
 // ──────────────────────────────────────────────
 // Exported HeroCanvas Wrapper Component

@@ -30,7 +30,7 @@ export default function MerchantSection() {
   ];
 
   return (
-    <section id="merchants" className="py-20 lg:py-28 bg-white relative overflow-hidden">
+    <section id="merchants" className="py-20 lg:py-28 bg-white relative overflow-hidden scroll-mt-24">
       
       {/* Background Tech Grid Lines (Linear 3% Opacity Grid) */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
