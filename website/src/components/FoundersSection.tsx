@@ -13,13 +13,13 @@ export default function FoundersSection() {
     {
       name: isRTL ? "مازن محمد حسن النعيم" : "Mazen Mohamed Hassan Alnaeem",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/mazen-mohamed-hassan-alnaeem.jpg",
+      image: "/founders/mazen-mohamed-hassan-alnaeem.webp",
       objectPos: "object-top",
     },
     {
       name: isRTL ? "المدثر عامر الفاضل" : "Almodther Amer Alfadel",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/almodther-amer-alfadel.jpg",
+      image: "/founders/almodther-amer-alfadel.webp",
       objectPos: "object-top",
     },
   ];
@@ -30,7 +30,7 @@ export default function FoundersSection() {
       {/* Subtle Brand Watermark in Background */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none overflow-hidden">
         <Image
-          src="/logo.png"
+          src="/experience/brand/logo.webp"
           alt="Talabaty Watermark"
           width={550}
           height={550}

@@ -45,7 +45,7 @@ export default function CourierSection() {
               <ImageReveal delay={0.2} className="w-full max-w-md">
                 <div className="relative rounded-3xl overflow-hidden border border-gray-800 shadow-2xl bg-gray-900">
                   <Image
-                    src="/visuals/courier-dashboard.png"
+                    src="/experience/courier/courier-dashboard.webp"
                     alt="Talabaty Courier Dashboard Visual"
                     width={1024}
                     height={576}

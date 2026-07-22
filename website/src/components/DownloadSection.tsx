@@ -16,7 +16,7 @@ export default function DownloadSection() {
       {/* Brand Mark Watermark in Background (Opacity 4%) */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.04] pointer-events-none select-none overflow-hidden">
         <Image
-          src="/logo.png"
+          src="/experience/brand/logo.webp"
           alt="Talabaty Brandmark"
           width={700}
           height={700}

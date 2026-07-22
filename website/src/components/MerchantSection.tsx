@@ -100,7 +100,7 @@ export default function MerchantSection() {
 
                 <div className="relative w-full bg-white rounded-3xl p-4 sm:p-6 border border-orange-100/90 shadow-xl shadow-orange-950/5 transition-all duration-300 overflow-hidden">
                   <Image
-                    src="/visuals/merchant-dashboard.png"
+                    src="/experience/merchant/merchant-dashboard.webp"
                     alt="Talabaty Merchant Dashboard Visual"
                     width={1024}
                     height={576}

@@ -47,7 +47,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <Image
-              src="/logo.png"
+              src="/experience/brand/logo.webp"
               alt="Talabaty Logo"
               width={140}
               height={45}

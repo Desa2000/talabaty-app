@@ -20,7 +20,7 @@ export default function Footer() {
           <div className="lg:col-span-5 flex flex-col items-start text-right">
             <Link href="/" className="mb-4">
               <Image
-                src="/logo.png"
+                src="/experience/brand/logo.webp"
                 alt="Talabaty Logo"
                 width={150}
                 height={50}
