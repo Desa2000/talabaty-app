@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "@/context/LanguageContext";
-import { ArrowLeft, ArrowRight, Store, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Store, Zap, ShieldCheck, Headphones } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   FadeUp,
@@ -22,8 +22,11 @@ export default function Hero() {
   return (
     <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-32 overflow-hidden bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F2] to-white">
       
-      {/* Soft Ambient Radial Orange Glow (Lusion Depth Layer) */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-[#FF5722]/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Background Urban Atmosphere Layer & Ambient Orange Radial Glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-[#FF5722]/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* Tech Grid Lines (Linear 3% opacity grid) */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none -z-10" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
@@ -31,12 +34,12 @@ export default function Hero() {
           {/* Text Content Column (Col 7) */}
           <div className="lg:col-span-7 flex flex-col items-start text-right">
             
-            {/* 100ms: Eyebrow Section Label */}
+            {/* Eyebrow Label */}
             <FadeUp delay={0.1}>
-              <SectionLabel text={isRTL ? "من منصتك السودانية الأولى للتوصيل" : "Sudan's #1 Delivery Platform"} />
+              <SectionLabel text={isRTL ? "طلباتك..." : "Your Orders..."} />
             </FadeUp>
 
-            {/* 200ms - 300ms: Main Headline Storytelling */}
+            {/* Main Headline */}
             <FadeUp delay={0.2}>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#1A1D27] tracking-tight leading-[1.15] mb-4">
                 <span>{t("heroTitlePrefix")}</span>{" "}
@@ -44,7 +47,7 @@ export default function Hero() {
               </h1>
             </FadeUp>
 
-            {/* 450ms: Subtitle & Brand Phrase */}
+            {/* Subtitle & Brand Phrase */}
             <FadeUp delay={0.35}>
               <p className="text-lg sm:text-xl text-gray-600 font-medium mb-2 max-w-2xl leading-relaxed">
                 {t("heroDescription")}
@@ -54,25 +57,42 @@ export default function Hero() {
               </p>
             </FadeUp>
 
-            {/* Checklist */}
+            {/* 3 Small Benefits Icons Below Copy */}
             <FadeUp delay={0.45}>
-              <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-8 text-sm font-bold text-gray-700">
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {isRTL ? "مطاعم طازجة" : "Fresh Restaurants"}
-                </span>
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {isRTL ? "سوبرماركت شامل" : "Full Supermarkets"}
-                </span>
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {isRTL ? "صيدليات مجاورة" : "Nearby Pharmacies"}
-                </span>
+              <div className="grid grid-cols-3 gap-3 sm:gap-6 mb-8 w-full max-w-lg">
+                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-orange-100/80 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF5722] flex items-center justify-center shrink-0">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#1A1D27]">توصيل سريع</span>
+                    <span className="text-[11px] text-gray-500 font-medium">أقرب ليك</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-emerald-100/80 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#1A1D27]">دفع آمن</span>
+                    <span className="text-[11px] text-gray-500 font-medium">وسهل</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 bg-white p-3 rounded-2xl border border-blue-100/80 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#1A1D27]">دعم مباشر</span>
+                    <span className="text-[11px] text-gray-500 font-medium">معاك</span>
+                  </div>
+                </div>
               </div>
             </FadeUp>
 
-            {/* 550ms: Buttons with Linear Micro-interactions */}
+            {/* Call to Action Buttons */}
             <FadeUp delay={0.55} className="w-full sm:w-auto">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
                 
@@ -86,7 +106,7 @@ export default function Hero() {
                   <span>{t("downloadApp")}</span>
                 </motion.div>
 
-                {/* Merchant CTA Button */}
+                {/* Secondary Merchant CTA */}
                 <motion.div
                   whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.98 }}
@@ -107,7 +127,7 @@ export default function Hero() {
 
           </div>
 
-          {/* 650ms: Customer App Visual Column (Apple Scale Reveal + Lusion 3D Tilt) */}
+          {/* Customer App Visual Column (Apple Scale Reveal + Lusion 3D Tilt) */}
           <div className="lg:col-span-5 relative flex justify-center items-center mt-8 lg:mt-0">
             <ImageReveal delay={0.65} className="w-full max-w-sm sm:max-w-md">
               <TiltVisual>

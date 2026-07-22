@@ -4,7 +4,6 @@ import React from "react";
 import Image from "next/image";
 import { useLanguage } from "@/context/LanguageContext";
 import { FadeUp, StaggerContainer, StaggerChild, SectionLabel } from "@/components/motion/Animations";
-import { motion } from "framer-motion";
 
 export default function FoundersSection() {
   const { lang } = useLanguage();
@@ -15,13 +14,13 @@ export default function FoundersSection() {
       name: isRTL ? "مازن محمد حسن النعيم" : "Mazen Mohamed Hassan Alnaeem",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
       image: "/founders/mazen-mohamed-hassan-alnaeem.jpg",
-      objectPos: "object-center",
+      objectPos: "object-top",
     },
     {
       name: isRTL ? "المدثر عامر الفاضل" : "Almodther Amer Alfadel",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
       image: "/founders/almodther-amer-alfadel.jpg",
-      objectPos: "object-center",
+      objectPos: "object-top",
     },
   ];
 
@@ -55,21 +54,21 @@ export default function FoundersSection() {
           </div>
         </FadeUp>
 
-        {/* Founders Cards Grid (Desktop: 2 side-by-side, Mobile: stacked) */}
+        {/* Founders Cards Grid (Desktop: 2 side-by-side, Mobile: 1 per row stacked) */}
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {founders.map((founder, idx) => (
             <StaggerChild key={idx}>
-              <div className="bg-[#FAF7F2]/70 rounded-3xl p-6 sm:p-8 border border-orange-100/80 shadow-xs flex flex-col items-center text-center group">
+              <div className="bg-[#FAF7F2]/80 rounded-3xl p-6 sm:p-8 border border-orange-100/90 shadow-sm flex flex-col items-center text-center group transition-all duration-300 hover:border-orange-200">
                 
-                {/* Photo Container - Max scale 1.02 on hover */}
-                <div className="relative w-full aspect-[4/4.5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-100 shadow-sm">
+                {/* Photo Container - Clean portrait aspect ratio (4/5) with rounded corners & subtle orange border */}
+                <div className="relative w-full aspect-[4/5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-200/80 shadow-md">
                   <Image
                     src={founder.image}
                     alt={founder.name}
                     fill
                     sizes="(max-width: 768px) 280px, 320px"
                     className={`object-cover ${founder.objectPos} group-hover:scale-[1.02] transition-transform duration-300`}
-                    priority={idx === 0}
+                    priority={true}
                   />
                 </div>
 
@@ -77,7 +76,7 @@ export default function FoundersSection() {
                 <h3 className="text-xl sm:text-2xl font-bold text-[#1A1D27] mb-2">
                   {founder.name}
                 </h3>
-                <span className="inline-block px-3.5 py-1 rounded-full bg-white text-[#FF5722] text-xs font-bold border border-orange-100">
+                <span className="inline-block px-4 py-1 rounded-full bg-white text-[#FF5722] text-xs font-bold border border-orange-100 shadow-xs">
                   {founder.role}
                 </span>
               </div>
