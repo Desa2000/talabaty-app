@@ -30,20 +30,20 @@ export default function ContactPage() {
     <div className="flex flex-col min-h-screen bg-[#FAF7F2]">
       <Navbar />
 
-      <main className="flex-grow py-12 lg:py-20">
+      <main className="flex-grow py-28 lg:py-36">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-orange-100 text-[#FF5722] text-xs font-bold mb-4">
+            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-orange-100 text-[#FF5722] text-xs font-bold mb-4 border border-orange-200">
               <MessageSquare className="w-4 h-4" />
-              <span>فريق الدعم في خدمتك 💬</span>
+              <span>فريق الدعم في خدمتك</span>
             </span>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#1A1D27] tracking-tight mb-4">
-              تواصل مع فريق طلباتي
+              نحن معاك
             </h1>
             <p className="text-base sm:text-lg text-gray-600 font-medium">
-              نحن هنا لمساعدتك والإجابة على كافة استفساراتك واقتراحاتك على مدار الساعة.
+              عندك سؤال، اقتراح أو مشكلة؟ اتواصل معانا.
             </p>
           </div>
 
@@ -169,7 +169,20 @@ export default function ContactPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-2">
-                        الموضوع *
+                        البريد الإلكتروني
+                      </label>
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        placeholder="example@domain.com"
+                        className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-[#FF5722] focus:ring-2 focus:ring-orange-100 text-sm font-semibold outline-none transition-all dir-ltr text-right"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        نوع الاستفسار *
                       </label>
                       <input
                         type="text"
@@ -183,7 +196,7 @@ export default function ContactPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-2">
-                        نص الرسالة *
+                        الرسالة *
                       </label>
                       <textarea
                         required

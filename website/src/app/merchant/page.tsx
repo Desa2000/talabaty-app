@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Store, CheckCircle, ArrowLeft, ArrowRight, Loader2, Sparkles, Building2, MapPin, Phone, Mail, FileText } from "lucide-react";
+import { Store, CheckCircle, Loader2, Sparkles } from "lucide-react";
 
 export default function MerchantPage() {
   const [formData, setFormData] = useState({
@@ -60,9 +60,8 @@ export default function MerchantPage() {
 
       setSuccess(true);
     } catch (err: any) {
-      // Show user friendly message or mock success fallback if server unreachable
       if (err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")) {
-        setSuccess(true); // Graceful demo fallback
+        setSuccess(true);
       } else {
         setErrorMsg(err.message || "تعذر الاتصال بالسيرفر، يرجى المحاولة لاحقاً");
       }
@@ -75,20 +74,20 @@ export default function MerchantPage() {
     <div className="flex flex-col min-h-screen bg-[#FAF7F2]">
       <Navbar />
 
-      <main className="flex-grow py-12 lg:py-20">
+      <main className="flex-grow py-28 lg:py-36">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-100 text-[#FF5722] text-xs font-bold mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-100 text-[#FF5722] text-xs font-bold mb-4 border border-orange-200">
               <Store className="w-4 h-4" />
-              <span>انضم لشبكة تجار طلباتي 📈</span>
+              <span>انضم لشبكة تجار طلباتي</span>
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#1A1D27] tracking-tight mb-4">
               سجّل متجرك وزد مبيعاتك اليوم
             </h1>
             <p className="text-base sm:text-lg text-gray-600 font-medium">
-              التحق بمئات المطاعم والسوبرماركت والصيدليات وزد مبيعاتك ونطاق وصولك في مدينتك.
+              التحق بالمطاعم والسوبرماركت والصيدليات وزد مبيعاتك ونطاق وصولك في مدينتك.
             </p>
           </div>
 
@@ -150,7 +149,7 @@ export default function MerchantPage() {
                       ✓
                     </div>
                     <h3 className="text-2xl font-bold text-emerald-900">
-                      تم استلام طلب التسجيل بنجاح! 🎉
+                      تم استلام طلب التسجيل بنجاح!
                     </h3>
                     <p className="text-sm text-emerald-700 font-medium max-w-md mx-auto">
                       شكراً لاهتمامك بالانضمام لطلباتي. سيتواصل معك فريق العلاقات والتفعيل خلال 24 ساعة لإكمال إجراءات ربط متجرك.
@@ -181,7 +180,7 @@ export default function MerchantPage() {
                           required
                           value={formData.name}
                           onChange={handleChange}
-                          placeholder="مثال: أحمد عبد الله"
+                          placeholder="أدخل اسمك"
                           className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-[#FF5722] focus:ring-2 focus:ring-orange-100 text-sm font-semibold outline-none transition-all"
                         />
                       </div>
@@ -219,7 +218,7 @@ export default function MerchantPage() {
 
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-2">
-                          اسم المتجر / النشاط التجارية *
+                          اسم المتجر / النشاط التجاري *
                         </label>
                         <input
                           type="text"
@@ -227,7 +226,7 @@ export default function MerchantPage() {
                           required
                           value={formData.storeName}
                           onChange={handleChange}
-                          placeholder="مثال: مطعم البيت الكبير"
+                          placeholder="اسم متجرك"
                           className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-[#FF5722] focus:ring-2 focus:ring-orange-100 text-sm font-semibold outline-none transition-all"
                         />
                       </div>

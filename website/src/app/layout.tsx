@@ -12,11 +12,11 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   metadataBase: new URL("https://mytalabaty.com"),
   title: {
-    default: "طلباتي | Talabaty - تطبيق التوصيل الأول في السودان",
+    default: "طلباتي | Talabaty",
     template: "%s | طلباتي",
   },
   description:
-    "طلباتي منصة توصيل للمطاعم والسوبرماركت والصيدليات في السودان. اطلب وجباتك ومقاضيك ودواك وسننوصلها لك بسرعة وأمان.",
+    "طلباتي منصة سودانية للتوصيل من المطاعم والسوبرماركت والصيدليات.",
   keywords: [
     "طلباتي",
     "Talabaty",
@@ -30,9 +30,9 @@ export const metadata: Metadata = {
   authors: [{ name: "Talabaty Team" }],
   creator: "Talabaty Sudan",
   openGraph: {
-    title: "طلباتي | Talabaty - أسرع.. أسهل.. أقرب",
+    title: "طلباتي | Talabaty - أسرع.. أسهل.. أقرب ليك",
     description:
-      "منصة توصيل للمطاعم والسوبرماركت والصيدليات في السودان. توصيل سريع وموثوق بكوادر سودانية.",
+      "طلباتي منصة سودانية للتوصيل من المطاعم والسوبرماركت والصيدليات.",
     url: "https://mytalabaty.com",
     siteName: "طلباتي - Talabaty",
     images: [
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "طلباتي | Talabaty",
-    description: "منصة توصيل للمطاعم والسوبرماركت والصيدليات في السودان.",
+    description: "طلباتي منصة سودانية للتوصيل من المطاعم والسوبرماركت والصيدليات.",
     images: ["/logo.png"],
   },
   alternates: {
@@ -58,6 +58,26 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "طلباتي - Talabaty",
+  url: "https://mytalabaty.com",
+  logo: "https://mytalabaty.com/logo.png",
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "+249911421515",
+    contactType: "customer service",
+    areaServed: "SD",
+    availableLanguage: ["Arabic", "English"],
+  },
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Khartoum - Al Riyadh",
+    addressCountry: "SD",
   },
 };
 
@@ -70,6 +90,10 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" className={cairo.variable}>
       <head>
         <link rel="icon" href="/logo.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className="antialiased bg-white text-[#1A1D27] min-h-screen flex flex-col font-sans">
         <LanguageProvider>{children}</LanguageProvider>

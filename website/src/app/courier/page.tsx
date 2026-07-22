@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Bike, CheckCircle, ArrowLeft, ArrowRight, Loader2, Sparkles, Shield, DollarSign, Navigation } from "lucide-react";
+import { Bike, CheckCircle, Loader2, Sparkles, Zap, Bike as BikeIcon } from "lucide-react";
 
 export default function CourierPage() {
   const [formData, setFormData] = useState({
@@ -53,7 +53,7 @@ export default function CourierPage() {
       setSuccess(true);
     } catch (err: any) {
       if (err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")) {
-        setSuccess(true); // Demo fallback
+        setSuccess(true);
       } else {
         setErrorMsg(err.message || "تعذر الاتصال بالسيرفر، يرجى المحاولة لاحقاً");
       }
@@ -66,14 +66,14 @@ export default function CourierPage() {
     <div className="flex flex-col min-h-screen bg-[#FAF7F2]">
       <Navbar />
 
-      <main className="flex-grow py-12 lg:py-20">
+      <main className="flex-grow py-28 lg:py-36">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold mb-4 border border-emerald-200">
               <Bike className="w-4 h-4" />
-              <span>فرص عمل ودخل ممتاز 🛵</span>
+              <span>فرص عمل ودخل ممتاز</span>
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#1A1D27] tracking-tight mb-4">
               انضم لأسرة مناديب طلباتي
@@ -122,30 +122,30 @@ export default function CourierPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-orange-200/70 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">🏍️</span>
+                      <Bike className="w-5 h-5 text-[#FF5722]" />
                       <span className="text-sm font-bold text-[#1A1D27]">دراجة نارية (مواتر)</span>
                     </div>
-                    <span className="text-xs font-bold text-[#FF5722] bg-orange-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-[#FF5722] bg-orange-100 px-2.5 py-0.5 rounded-full">
                       الأكثر طلباً
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-orange-200/70 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">⚡</span>
+                      <Zap className="w-5 h-5 text-emerald-600" />
                       <span className="text-sm font-bold text-[#1A1D27]">دراجة كهربائية</span>
                     </div>
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
                       اقتصادي
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-orange-200/70 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">🚲</span>
+                      <BikeIcon className="w-5 h-5 text-blue-600" />
                       <span className="text-sm font-bold text-[#1A1D27]">دراجة هوائية</span>
                     </div>
-                    <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
                       صديق للبيئة
                     </span>
                   </div>
@@ -170,7 +170,7 @@ export default function CourierPage() {
                       ✓
                     </div>
                     <h3 className="text-2xl font-bold text-emerald-900">
-                      تم استلام طلب انضمامك بنجاح! 🎉
+                      تم استلام طلب انضمامك بنجاح!
                     </h3>
                     <p className="text-sm text-emerald-700 font-medium max-w-md mx-auto">
                       شكراً لرغبتك بالعمل معنا. سيتواصل معك فريق التشغيل والمناديب خلال 24 ساعة لاستكمال التوثيق واستلام حساب المندوب.
@@ -201,7 +201,7 @@ export default function CourierPage() {
                           required
                           value={formData.name}
                           onChange={handleChange}
-                          placeholder="مثال: محمد أحمد علي"
+                          placeholder="أدخل اسمك"
                           className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-[#FF5722] focus:ring-2 focus:ring-orange-100 text-sm font-semibold outline-none transition-all"
                         />
                       </div>

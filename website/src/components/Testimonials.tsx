@@ -26,10 +26,10 @@ export default function Testimonials() {
       name: isRTL ? "د. سارة عثمان" : "Dr. Sara Osman",
       role: isRTL ? "عميل في أم درمان" : "Customer in Omdurman",
       comment: isRTL
-        ? "أطلب مقاضي البيت والأدوية الصيدلانية بضغطة زر وتوصل في وقت قياسي. خدمة موثوقة ومريحة للغاية."
+        ? "أطلب حاجات البيت والأدوية الصيدلانية بضغطة زر وتوصل في وقت قياسي. خدمة موثوقة ومريحة للغاية."
         : "I order groceries and pharmacy items in one click and they arrive in record time. Highly reliable and convenient.",
       rating: 5,
-      tag: isRTL ? "مقاضي وصيدلية" : "Grocery & Pharmacy",
+      tag: isRTL ? "سوبرماركت وصيدلية" : "Grocery & Pharmacy",
       bg: "bg-emerald-50/50",
       borderColor: "border-emerald-100",
     },

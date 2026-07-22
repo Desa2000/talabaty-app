@@ -3,18 +3,18 @@
 import React from "react";
 import Image from "next/image";
 import { useLanguage } from "@/context/LanguageContext";
-import { FadeUp, StaggerContainer, StaggerChild } from "@/components/motion/Animations";
+import { FadeUp, StaggerContainer, StaggerChild, SectionLabel } from "@/components/motion/Animations";
 import { motion } from "framer-motion";
 
 export default function FoundersSection() {
-  const { lang, t } = useLanguage();
+  const { lang } = useLanguage();
   const isRTL = lang === "ar";
 
   const founders = [
     {
       name: isRTL ? "مازن محمد حسن النعيم" : "Mazen Mohamed Hassan Alnaeem",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/mazen-hassan-alnaeem.jpg",
+      image: "/founders/mazen-mohamed-hassan-alnaeem.jpg",
       objectPos: "object-center",
     },
     {
@@ -26,7 +26,8 @@ export default function FoundersSection() {
   ];
 
   return (
-    <section id="founders" className="py-20 bg-[#FAF7F2] relative overflow-hidden">
+    <section id="founders" className="py-20 lg:py-28 bg-white relative overflow-hidden">
+      
       {/* Subtle Brand Watermark in Background */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none overflow-hidden">
         <Image
@@ -42,16 +43,14 @@ export default function FoundersSection() {
         {/* Section Header */}
         <FadeUp>
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="text-xs font-bold text-[#FF5722] bg-orange-100/80 px-4 py-1.5 rounded-full border border-orange-200/80 inline-block mb-3">
-              {isRTL ? "فريق القيادة" : "Leadership Team"}
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-[#1A1D27] tracking-tight mb-3">
+            <SectionLabel text={isRTL ? "فريق القيادة" : "Leadership Team"} />
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#1A1D27] tracking-tight mb-3">
               {isRTL ? "مؤسسو طلباتي" : "Talabaty Founders"}
             </h2>
             <p className="text-base sm:text-lg text-gray-600 font-medium leading-relaxed">
               {isRTL
-                ? "الفريق الذي يعمل على بناء تجربة توصيل أسهل وأسرع في السودان."
-                : "The team building a faster and easier delivery experience in Sudan."}
+                ? "فريق سوداني شغال عشان يخلي الطلب والتوصيل أسهل وأسرع."
+                : "A Sudanese team building a faster and easier delivery experience."}
             </p>
           </div>
         </FadeUp>
@@ -60,38 +59,28 @@ export default function FoundersSection() {
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {founders.map((founder, idx) => (
             <StaggerChild key={idx}>
-              <motion.div
-                whileHover={{ y: -4, boxShadow: "0 20px 40px -15px rgba(255, 87, 34, 0.12)" }}
-                className="bg-white rounded-3xl p-6 sm:p-8 border border-orange-100 hover:border-[#FF5722]/40 shadow-sm transition-all duration-300 flex flex-col items-center text-center group"
-              >
-                {/* Photo Container - Professional Portrait Aspect Ratio */}
-                <div className="relative w-full aspect-[4/4.5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-100 group-hover:border-[#FF5722]/50 transition-colors duration-300 shadow-md">
-                  <motion.div
-                    initial={{ scale: 0.97 }}
-                    whileInView={{ scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: idx * 0.15 }}
-                    className="w-full h-full relative"
-                  >
-                    <Image
-                      src={founder.image}
-                      alt={founder.name}
-                      fill
-                      sizes="(max-width: 768px) 280px, 320px"
-                      className={`object-cover ${founder.objectPos} group-hover:scale-105 transition-transform duration-500`}
-                      priority={idx === 0}
-                    />
-                  </motion.div>
+              <div className="bg-[#FAF7F2]/70 rounded-3xl p-6 sm:p-8 border border-orange-100/80 shadow-xs flex flex-col items-center text-center group">
+                
+                {/* Photo Container - Max scale 1.02 on hover */}
+                <div className="relative w-full aspect-[4/4.5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-100 shadow-sm">
+                  <Image
+                    src={founder.image}
+                    alt={founder.name}
+                    fill
+                    sizes="(max-width: 768px) 280px, 320px"
+                    className={`object-cover ${founder.objectPos} group-hover:scale-[1.02] transition-transform duration-300`}
+                    priority={idx === 0}
+                  />
                 </div>
 
                 {/* Name & Role */}
                 <h3 className="text-xl sm:text-2xl font-bold text-[#1A1D27] mb-2">
                   {founder.name}
                 </h3>
-                <span className="inline-block px-3.5 py-1 rounded-full bg-orange-50 text-[#FF5722] text-xs font-bold border border-orange-100">
+                <span className="inline-block px-3.5 py-1 rounded-full bg-white text-[#FF5722] text-xs font-bold border border-orange-100">
                   {founder.role}
                 </span>
-              </motion.div>
+              </div>
             </StaggerChild>
           ))}
         </StaggerContainer>
