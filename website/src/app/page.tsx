@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Services from "@/components/Services";
+import OrderJourney from "@/components/OrderJourney";
 import HowItWorks from "@/components/HowItWorks";
 import MerchantSection from "@/components/MerchantSection";
 import CourierSection from "@/components/CourierSection";
@@ -21,6 +22,7 @@ export default function HomePage() {
       <main className="flex-grow">
         <Hero />
         <Services />
+        <OrderJourney />
         <HowItWorks />
         <MerchantSection />
         <CourierSection />

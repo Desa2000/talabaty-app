@@ -3,16 +3,21 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useLanguage } from "@/context/LanguageContext";
-import { ArrowLeft, ArrowRight, Store, Zap, ShieldCheck, Headphones } from "lucide-react";
+import { ArrowLeft, ArrowRight, Store, Zap, ShieldCheck, Headphones, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   FadeUp,
   ImageReveal,
   SectionLabel,
-  TiltVisual,
   MOTION_TOKENS,
 } from "@/components/motion/Animations";
+
+// Dynamic import for WebGL Canvas (Client-side only, SSR safe, code-split)
+const HeroCanvas = dynamic(() => import("@/components/experience/HeroCanvas"), {
+  ssr: false,
+});
 
 export default function Hero() {
   const { lang, t } = useLanguage();
@@ -20,18 +25,24 @@ export default function Hero() {
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
 
   return (
-    <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-32 overflow-hidden bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F2] to-white">
+    <section
+      id="hero-section"
+      className="relative pt-28 pb-16 lg:pt-36 lg:pb-28 overflow-hidden bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F2] to-white"
+    >
       
+      {/* 3D WebGL Canvas Layer (Desktop Only, Dynamic Code-Split, Client Side Only) */}
+      <HeroCanvas />
+
       {/* Background Urban Atmosphere Layer & Ambient Orange Radial Glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-[#FF5722]/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-[#FF5722]/10 rounded-full blur-3xl pointer-events-none z-0" />
 
       {/* Tech Grid Lines (Linear 3% opacity grid) */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none -z-10" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none z-0" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           
-          {/* Text Content Column (Col 7) */}
+          {/* Text Content Column (100% Accessible Selectable DOM HTML Overlay) */}
           <div className="lg:col-span-7 flex flex-col items-start text-right">
             
             {/* Eyebrow Label */}
@@ -101,7 +112,7 @@ export default function Hero() {
                   whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: MOTION_TOKENS.FAST }}
-                  className="relative inline-flex items-center justify-center px-8 py-4 rounded-2xl text-base font-bold text-white bg-[#FF5722] hover:bg-[#E64A19] shadow-lg shadow-orange-500/25 cursor-default select-none"
+                  className="relative inline-flex items-center justify-center px-8 py-4 rounded-2xl text-base font-bold text-white bg-[#FF5722] hover:bg-[#E64A19] shadow-lg shadow-orange-500/25 cursor-default select-none pointer-events-auto"
                 >
                   <span>{t("downloadApp")}</span>
                 </motion.div>
@@ -111,6 +122,7 @@ export default function Hero() {
                   whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: MOTION_TOKENS.FAST }}
+                  className="pointer-events-auto"
                 >
                   <Link
                     href="/merchant"
@@ -127,27 +139,39 @@ export default function Hero() {
 
           </div>
 
-          {/* Customer App Visual Column (Apple Scale Reveal + Lusion 3D Tilt) */}
+          {/* Customer App Visual Column (Static Fallback for Mobile / WebGL-Disabled + R3F Canvas Container) */}
           <div className="lg:col-span-5 relative flex justify-center items-center mt-8 lg:mt-0">
             <ImageReveal delay={0.65} className="w-full max-w-sm sm:max-w-md">
-              <TiltVisual>
-                <div className="relative bg-white rounded-[40px] p-3 sm:p-4 border border-orange-100/90 shadow-2xl shadow-orange-950/10 transition-all duration-300 overflow-hidden">
-                  <div className="relative w-full aspect-[9/18] rounded-[32px] overflow-hidden bg-[#FAF7F2]">
-                    <Image
-                      src="/visuals/customer-app.png"
-                      alt="Talabaty Customer App Official Visual"
-                      fill
-                      sizes="(max-width: 768px) 300px, 420px"
-                      className="object-contain object-top"
-                      priority
-                    />
-                  </div>
+              <div className="relative bg-white rounded-[40px] p-3 sm:p-4 border border-orange-100/90 shadow-2xl shadow-orange-950/10 transition-all duration-300 overflow-hidden">
+                <div className="relative w-full aspect-[9/18] rounded-[32px] overflow-hidden bg-[#FAF7F2]">
+                  <Image
+                    src="/experience/hero/customer-phone.webp"
+                    alt="Talabaty Customer App Official Visual"
+                    fill
+                    sizes="(max-width: 768px) 300px, 420px"
+                    className="object-contain object-top"
+                    priority
+                  />
                 </div>
-              </TiltVisual>
+              </div>
             </ImageReveal>
           </div>
 
         </div>
+
+        {/* Scroll to Explore Indicator */}
+        <div className="mt-16 flex flex-col items-center justify-center text-center">
+          <motion.a
+            href="#services"
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="inline-flex flex-col items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-[#FF5722] transition-colors pointer-events-auto"
+          >
+            <span>{isRTL ? "اكتشف طلباتي" : "Scroll to Explore"}</span>
+            <ChevronDown className="w-4 h-4 text-[#FF5722]" />
+          </motion.a>
+        </div>
+
       </div>
     </section>
   );
