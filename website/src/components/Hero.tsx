@@ -7,6 +7,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Download, Store, Zap, ShieldCheck, Star, MapPin, Clock } from "lucide-react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { FadeUp, Float, SlideIn } from "@/components/motion/Animations";
+import { ShimmerButton } from "./ui/ShimmerButton";
+import { FlipWords } from "./ui/FlipWords";
 
 export default function Hero() {
   const { t } = useLanguage();
@@ -65,19 +67,9 @@ export default function Hero() {
               >
                 {t("heroTitlePrefix")}
               </motion.span>
-              <span className="block mt-2 text-[#FF5722] drop-shadow-sm flex flex-wrap justify-center lg:justify-start gap-x-3">
-                {heroTitleMainWords.map((word, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.5 + i * 0.15 }}
-                    className="inline-block"
-                  >
-                    {word}
-                  </motion.span>
-                ))}
-              </span>
+              <div className="mt-2 text-[#FF5722] drop-shadow-sm flex items-center gap-2">
+                <FlipWords words={heroTitleMainWords} duration={2500} />
+              </div>
             </h1>
 
             {/* Subtitle Paragraph fades up after headlines */}
@@ -87,15 +79,15 @@ export default function Hero() {
               </p>
             </FadeUp>
 
+
             {/* Action Buttons appear after text */}
             <FadeUp delay={1.3}>
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-10">
-                <Link
-                  href="#download"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl text-base font-bold text-white bg-[#FF5722] hover:bg-[#E64A19] shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/35 transition-all active:scale-95"
-                >
-                  <Download className="w-5 h-5" />
-                  <span>{t("downloadApp")}</span>
+                <Link href="#download" className="w-full sm:w-auto">
+                  <ShimmerButton className="w-full sm:w-auto text-base px-8 py-4 rounded-2xl">
+                    <Download className="w-5 h-5" />
+                    <span>{t("downloadApp")}</span>
+                  </ShimmerButton>
                 </Link>
 
                 <Link

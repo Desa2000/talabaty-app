@@ -28,6 +28,7 @@ export default function Navbar() {
     { label: t("home"), href: "/" },
     { label: t("services"), href: "/#services" },
     { label: t("howItWorks"), href: "/#how-it-works" },
+    { label: t("founders"), href: "/#founders" },
     { label: t("merchants"), href: "/merchant" },
     { label: t("couriers"), href: "/courier" },
     { label: t("faq"), href: "/#faq" },

@@ -73,7 +73,13 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <span className="block text-xs font-bold text-gray-400">الهاتف للدعم والتواصل</span>
-                    <span className="text-base font-bold text-[#1A1D27] dir-ltr text-right block">+249 900 000 000</span>
+                    <a
+                      href="tel:+249911421515"
+                      className="text-base font-bold text-[#1A1D27] hover:text-[#FF5722] transition-colors inline-block"
+                      dir="ltr"
+                    >
+                      +249911421515
+                    </a>
                   </div>
                 </div>
 
@@ -83,7 +89,13 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <span className="block text-xs font-bold text-gray-400">البريد الإلكتروني الرسمي</span>
-                    <span className="text-base font-bold text-[#1A1D27] dir-ltr text-right block">support@mytalabaty.com</span>
+                    <a
+                      href="mailto:support@mytalabaty.com"
+                      className="text-base font-bold text-[#1A1D27] hover:text-[#FF5722] transition-colors inline-block"
+                      dir="ltr"
+                    >
+                      support@mytalabaty.com
+                    </a>
                   </div>
                 </div>
               </div>

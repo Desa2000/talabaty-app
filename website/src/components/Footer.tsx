@@ -37,9 +37,28 @@ export default function Footer() {
               </span>
             </Link>
 
-            <p className="text-sm font-medium text-gray-500 max-w-sm leading-relaxed mb-6">
+            <p className="text-sm font-medium text-gray-500 max-w-sm leading-relaxed mb-4">
               {t("footerDesc")}
             </p>
+
+            {/* Official Contact Info */}
+            <div className="space-y-1.5 text-xs font-bold text-gray-600 mb-6 flex flex-col items-start">
+              <span>📍 الخرطوم - الرياض، السودان</span>
+              <a
+                href="tel:+249911421515"
+                className="hover:text-[#FF5722] transition-colors"
+                dir="ltr"
+              >
+                +249911421515 📞
+              </a>
+              <a
+                href="mailto:support@mytalabaty.com"
+                className="hover:text-[#FF5722] transition-colors"
+                dir="ltr"
+              >
+                support@mytalabaty.com ✉️
+              </a>
+            </div>
 
             {/* Social Icons */}
             <div className="flex items-center gap-2">
@@ -66,8 +85,9 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm font-semibold text-gray-600">
               {[
                 { href: "/", label: t("home") },
-                { href: "/#how-it-works", label: t("howItWorks") },
                 { href: "/#services", label: t("services") },
+                { href: "/#how-it-works", label: t("howItWorks") },
+                { href: "/#founders", label: t("founders") },
                 { href: "/#faq", label: t("faq") },
               ].map((item) => (
                 <li key={item.href}>
