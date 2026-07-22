@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #FF5722;
+    --primary-hover: #E64A19;
+    --primary-light: #FFF0EB;
+    --secondary: #1A1D27;
+    --background: #FFFFFF;
+    --background-warm: #FAF7F2;
+    --card-border: #F0EAE1;
+  }
+
+  body {
+    background-color: #FFFFFF;
+    color: #1A1D27;
+    font-family: var(--font-cairo), system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF7F2;
+}
+::-webkit-scrollbar-thumb {
+  background: #FFD5C6;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF5722;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Utilities */
+.bg-warm {
+  background-color: #FAF7F2;
+}
+
+.bg-gradient-warm {
+  background: linear-gradient(180deg, #FFFDF9 0%, #FAF7F2 100%);
+}
+
+.bg-gradient-hero {
+  background: radial-gradient(circle at 50% 0%, #FFF3EC 0%, #FFFFFF 70%);
+}
+
+.border-warm {
+  border-color: #F0EAE1;
+}
+
+.shadow-soft {
+  box-shadow: 0 10px 30px -10px rgba(255, 87, 34, 0.08);
+}
+
+.shadow-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.shadow-card-hover {
+  box-shadow: 0 20px 40px -15px rgba(255, 87, 34, 0.12);
+}
