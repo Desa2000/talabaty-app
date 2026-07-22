@@ -7,7 +7,7 @@ import '../../data/models/user_model.dart';
 import '../utils/firebase_mapper.dart';
 
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
 
   // Stream all active orders (for courier & merchant)
   Stream<List<OrderModel>> streamAllOrders() {

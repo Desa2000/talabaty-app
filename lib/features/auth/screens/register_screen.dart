@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -60,6 +60,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phone: widget.phone,
         email: widget.email,
         role: _selectedRole,
+        businessName: _businessNameController.text.trim(),
+        storeName: _businessNameController.text.trim().isNotEmpty
+            ? _businessNameController.text.trim()
+            : 'مطعم ${_nameController.text.trim()}',
+        storeCategory: _selectedStoreType.name.toUpperCase(),
+        vehicleType: _selectedVehicle.name.toUpperCase(),
+        licenseNumber: _licensePlateController.text.trim(),
       );
       
       if (mounted) {

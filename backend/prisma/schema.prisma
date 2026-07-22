@@ -1,0 +1,252 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  CUSTOMER
+  MERCHANT
+  COURIER
+  ADMIN
+}
+
+enum VehicleType {
+  BICYCLE
+  ELECTRIC_BICYCLE
+  MOTORCYCLE
+}
+
+enum CourierStatus {
+  OFFLINE
+  ONLINE
+  BUSY
+}
+
+enum StoreCategory {
+  RESTAURANT
+  SUPERMARKET
+  PHARMACY
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  COURIER_ASSIGNED
+  PICKED_UP
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANKAK
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id              String           @id @default(uuid())
+  name            String
+  phone           String           @unique
+  email           String?          @unique
+  passwordHash    String
+  role            UserRole
+  isVerified      Boolean          @default(false)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  customerProfile CustomerProfile?
+  merchantProfile MerchantProfile?
+  courierProfile  CourierProfile?
+  adminProfile    AdminProfile?
+  
+  addresses       Address[]
+  deviceTokens    DeviceToken[]
+  refreshTokens   RefreshToken[]
+
+  // Order relationships
+  customerOrders  Order[]          @relation("CustomerOrders")
+  courierOrders   Order[]          @relation("CourierOrders")
+}
+
+model CustomerProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultAddressId String?
+}
+
+model MerchantProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName        String
+  businessDescription String?
+  businessArea        String?
+  stores              Store[]
+}
+
+model CourierProfile {
+  id                   String        @id @default(uuid())
+  userId               String        @unique
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType          VehicleType
+  idNumber             String
+  licenseNumber        String?
+  status               CourierStatus @default(OFFLINE)
+  isOnline             Boolean       @default(false)
+  currentLatitude      Float?
+  currentLongitude     Float?
+}
+
+model AdminProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Store {
+  id          String           @id @default(uuid())
+  merchantId  String
+  merchant    MerchantProfile  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  logoUrl     String?
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  category    StoreCategory
+  isOpen      Boolean          @default(true)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  products    Product[]
+  orders      Order[]
+}
+
+model ProductCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[]
+}
+
+model Product {
+  id          String           @id @default(uuid())
+  storeId     String
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  isAvailable Boolean          @default(true)
+  stock       Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  orderItems  OrderItem[]
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  city       String
+  area       String
+  street     String
+  landmark   String?
+  latitude   Float
+  longitude  Float
+  phone      String
+  createdAt  DateTime @default(now())
+}
+
+model Order {
+  id              String               @id @default(uuid())
+  customerId      String
+  customer        User                 @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  storeId         String
+  store           Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  courierId       String?
+  courier         User?                @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
+  status          OrderStatus          @default(PENDING)
+  subtotal        Float
+  deliveryFee     Float
+  total           Float
+  paymentMethod   PaymentMethod
+  deliveryAddress String
+  latitude        Float
+  longitude       Float
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+  payments        Payment[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity  Int
+  price     Float
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  timestamp DateTime    @default(now())
+  changedBy String
+  note      String?
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus @default(UNPAID)
+  amount         Float
+  transactionId  String?
+  createdAt      DateTime      @default(now())
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

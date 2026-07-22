@@ -58,10 +58,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (!mounted) return;
     
-    if (!authProvider.isAuthenticated) {
-      // Auto-login with test customer for development
-      authProvider.devAutoLogin();
-    }
+    // devAutoLogin has been disabled to allow real backend auth flow testing.
     
     if (authProvider.isAuthenticated) {
       try { context.read<NotificationProvider>().initFCM(); } catch (_) {}

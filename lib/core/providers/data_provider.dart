@@ -116,70 +116,74 @@ class DataProvider extends ChangeNotifier {
 
     if (_isDisposed) return;
 
-    // Listen to real-time data instead of mock data
-    await _storesSubscription?.cancel();
-    if (_isDisposed) return;
-    _storesSubscription = _firestore.streamStores().listen((stores) {
+    try {
+      // Listen to real-time data instead of mock data
+      await _storesSubscription?.cancel();
       if (_isDisposed) return;
+      _storesSubscription = _firestore.streamStores().listen((stores) {
+        if (_isDisposed) return;
 
-      // Firestore may be empty while the project is still being prepared.
-      // In that case, keep the cached/mock stores instead of replacing them
-      // with an empty list and leaving the customer home screen blank.
-      if (stores.isNotEmpty) {
-        _stores = stores;
+        // Firestore may be empty while the project is still being prepared.
+        // In that case, keep the cached/mock stores instead of replacing them
+        // with an empty list and leaving the customer home screen blank.
+        if (stores.isNotEmpty) {
+          _stores = stores;
+          unawaited(_saveData());
+          debugPrint('Loaded ${stores.length} stores from Firestore.');
+        } else {
+          debugPrint(
+            'Firestore stores collection is empty; running auto-migration...',
+          );
+          unawaited(migrateDataToFirestore());
+        }
+
+        notifyListeners();
+      }, onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Error streaming stores: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        // Keep the local/mock data when Firestore is unavailable.
+        notifyListeners();
+      });
+
+      await _productsSubscription?.cancel();
+      if (_isDisposed) return;
+      _productsSubscription = _firestore.streamProducts().listen((products) {
+        if (_isDisposed) return;
+
+        // Keep cached/mock products if the remote collection is empty.
+        if (products.isNotEmpty) {
+          _products = products;
+          unawaited(_saveData());
+          debugPrint('Loaded ${products.length} products from Firestore.');
+        } else {
+          debugPrint(
+            'Firestore products collection is empty; keeping ${_products.length} local products.',
+          );
+        }
+
+        notifyListeners();
+      }, onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Error streaming products: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        // Keep the local/mock data when Firestore is unavailable.
+        notifyListeners();
+      });
+
+      await _ordersSubscription?.cancel();
+      if (_isDisposed) return;
+      _ordersSubscription = _firestore.streamAllOrders().listen((syncedOrders) {
+        if (_isDisposed) return;
+        _orders = syncedOrders;
         unawaited(_saveData());
-        debugPrint('Loaded ${stores.length} stores from Firestore.');
-      } else {
-        debugPrint(
-          'Firestore stores collection is empty; running auto-migration...',
-        );
-        unawaited(migrateDataToFirestore());
-      }
-
-      notifyListeners();
-    }, onError: (Object error, StackTrace stackTrace) {
-      debugPrint('Error streaming stores: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      // Keep the local/mock data when Firestore is unavailable.
-      notifyListeners();
-    });
-
-    await _productsSubscription?.cancel();
-    if (_isDisposed) return;
-    _productsSubscription = _firestore.streamProducts().listen((products) {
-      if (_isDisposed) return;
-
-      // Keep cached/mock products if the remote collection is empty.
-      if (products.isNotEmpty) {
-        _products = products;
-        unawaited(_saveData());
-        debugPrint('Loaded ${products.length} products from Firestore.');
-      } else {
-        debugPrint(
-          'Firestore products collection is empty; keeping ${_products.length} local products.',
-        );
-      }
-
-      notifyListeners();
-    }, onError: (Object error, StackTrace stackTrace) {
-      debugPrint('Error streaming products: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      // Keep the local/mock data when Firestore is unavailable.
-      notifyListeners();
-    });
-
-    await _ordersSubscription?.cancel();
-    if (_isDisposed) return;
-    _ordersSubscription = _firestore.streamAllOrders().listen((syncedOrders) {
-      if (_isDisposed) return;
-      _orders = syncedOrders;
-      unawaited(_saveData());
-      notifyListeners();
-    }, onError: (Object error, StackTrace stackTrace) {
-      debugPrint('Error streaming orders: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      notifyListeners();
-    });
+        notifyListeners();
+      }, onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Error streaming orders: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        notifyListeners();
+      });
+    } catch (e) {
+      debugPrint('Firestore streams are not initialized/available: $e');
+    }
 
     _isInitialized = true;
     notifyListeners();

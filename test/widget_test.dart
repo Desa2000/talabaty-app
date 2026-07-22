@@ -8,5 +8,8 @@ void main() {
 
     // Verify the widget tree builds successfully.
     expect(find.byType(TalabatyApp), findsOneWidget);
+
+    // Pump out the splash delay timer so the test can end cleanly
+    await tester.pump(const Duration(seconds: 3));
   });
 }

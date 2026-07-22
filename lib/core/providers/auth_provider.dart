@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
-import '../../data/models/store_model.dart';
+import '../../data/services/auth_api_service.dart';
+import '../../core/network/api_client.dart';
+import '../../core/network/api_exception.dart';
 import '../services/firestore_service.dart';
 import '../constants/enums.dart';
 import '../router/app_router.dart';
@@ -19,7 +20,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthApiService _authApiService = AuthApiService();
   final FirestoreService _firestoreService = FirestoreService();
 
   // EmailJS Configuration
@@ -30,10 +31,19 @@ class AuthProvider extends ChangeNotifier {
   String? _generatedOtp;
   String? _pendingEmail;
 
-  // Secret suffix to generate a deterministic password for Firebase Auth
+  // Secret suffix to generate a deterministic password for Backend login
   final String _secretSuffix = '_@TalabatySecret2026';
 
   bool _isDisposed = false;
+
+  AuthProvider() {
+    // Register auto-logout hook when API token expires
+    ApiClient().onSessionExpired = () {
+      _currentUser = null;
+      _isLoading = false;
+      notifyListeners();
+    };
+  }
 
   @override
   void dispose() {
@@ -70,16 +80,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        final userModel = await _firestoreService.getUser(user.uid);
+      final token = await ApiClient().getAccessToken();
+      if (token != null) {
+        final user = await _authApiService.getMe();
         if (_isDisposed) return;
-        if (userModel != null) {
-          _currentUser = userModel;
+        if (user != null) {
+          _currentUser = user;
         } else {
-          // User is authenticated but has no profile, sign out
-          await _auth.signOut();
-          if (_isDisposed) return;
+          await ApiClient().clearTokens();
           _currentUser = null;
         }
       } else {
@@ -87,6 +95,7 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error checking auth status: $e');
+      _currentUser = null;
     } finally {
       if (!_isDisposed) {
         _isLoading = false;
@@ -157,7 +166,6 @@ class AuthProvider extends ChangeNotifier {
 
   Future<UserRole?> verifyOtp(String otp, {required Function(String) onError}) async {
     if (_generatedOtp == null || _pendingEmail == null) {
-      // FIX: ensure loading is never left true on early-exit error paths
       _isLoading = false;
       notifyListeners();
       onError('خطأ غير متوقع، الرجاء طلب الرمز مرة أخرى');
@@ -175,48 +183,39 @@ class AuthProvider extends ChangeNotifier {
       return null;
     }
 
-    // OTP Correct! Authenticate with Firebase using Email & Password trick
+    // OTP Correct! Login to REST Backend using Email & Password trick
     final deterministicPassword = '$_pendingEmail$_secretSuffix';
 
     try {
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: _pendingEmail!,
+      final res = await _authApiService.login(
+        identifier: _pendingEmail!,
         password: deterministicPassword,
       );
+
       if (_isDisposed) return null;
-      
-      final user = userCredential.user;
-      
-      if (user != null) {
-        final userModel = await _firestoreService.getUser(user.uid);
-        if (_isDisposed) return null;
-        
-        _isLoading = false;
-        if (userModel != null) {
-          _currentUser = userModel;
-          notifyListeners();
-          return userModel.role;
-        } else {
-          // User needs to register (should rarely happen if they successfully signed in)
-          notifyListeners();
-          return null; 
-        }
-      } else {
-        _isLoading = false;
-        notifyListeners();
-        return null;
-      }
-    } on FirebaseAuthException catch (e) {
-      if (_isDisposed) return null;
+
+      final user = res['user'] as UserModel;
+      await ApiClient().saveTokens(
+        accessToken: res['accessToken'],
+        refreshToken: res['refreshToken'],
+      );
+
+      _currentUser = user;
       _isLoading = false;
       notifyListeners();
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-        return null;
+      return user.role;
+    } on ApiException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      
+      // If user not found (status 401), we return null to trigger Register Screen navigation
+      if (e.statusCode == 401) {
+        return null; 
       }
-      onError(e.message ?? 'حدث خطأ أثناء تسجيل الدخول');
+      
+      onError(e.message);
       return null;
     } catch (e) {
-      if (_isDisposed) return null;
       _isLoading = false;
       notifyListeners();
       onError(e.toString());
@@ -224,126 +223,73 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> register({required String name, required String phone, required String email, required UserRole role}) async {
+  Future<void> register({
+    required String name,
+    required String phone,
+    required String email,
+    required UserRole role,
+    String? businessName,
+    String? businessDescription,
+    String? businessArea,
+    String? storeName,
+    String? storeCategory,
+    String? vehicleType,
+    String? idNumber,
+    String? licenseNumber,
+  }) async {
     _isLoading = true;
     notifyListeners();
-    
+
     try {
       final deterministicPassword = '$email$_secretSuffix';
-      // Create user in Firebase Auth
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: deterministicPassword,
-      );
-      if (_isDisposed) return;
+      Map<String, dynamic> res;
 
-      final user = userCredential.user;
-      if (user == null) {
-        throw Exception('فشل إنشاء الحساب');
-      }
-
-      final newUser = UserModel(
-        id: user.uid,
-        name: name,
-        phone: phone,
-        password: '', // Not used anymore
-        role: role,
-        createdAt: DateTime.now(),
-      );
-
-      await _firestoreService.saveUser(newUser);
-      if (_isDisposed) return;
-      
-      // If the user is a merchant, create a default store for them
       if (role == UserRole.merchant) {
-        final newStore = StoreModel(
-          id: 'store_${user.uid}', 
-          ownerId: user.uid,
-          name: 'مطعم $name',
-          type: StoreType.restaurant,
-          logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=400&auto=format&fit=crop',
+        res = await _authApiService.registerMerchant(
+          name: name,
           phone: phone,
-          area: 'الخرطوم',
-          street: 'عام',
-          landmark: '',
-          latitude: 15.5,
-          longitude: 32.5,
-          openingTime: '08:00 AM',
-          closingTime: '11:00 PM',
-          preparationTime: '15 - 30 دقيقة',
-          minimumOrder: 2000,
-          deliveryFee: 1000,
-          status: 'active',
-          rating: 5.0,
+          email: email,
+          password: deterministicPassword,
+          businessName: businessName ?? 'مطعم $name',
+          businessDescription: businessDescription ?? 'وجبات سودانية وعالمية طازجة',
+          businessArea: businessArea ?? 'الخرطوم',
+          storeName: storeName ?? 'مطعم $name',
+          storeCategory: storeCategory ?? 'RESTAURANT',
+          storeAddress: businessArea ?? 'الخرطوم',
+          latitude: 15.5640,
+          longitude: 32.5840,
         );
-        await _firestoreService.saveStore(newStore);
-        if (_isDisposed) return;
+      } else if (role == UserRole.courier) {
+        res = await _authApiService.registerCourier(
+          name: name,
+          phone: phone,
+          email: email,
+          password: deterministicPassword,
+          vehicleType: vehicleType ?? 'MOTORCYCLE',
+          idNumber: idNumber ?? '123456789',
+          licenseNumber: licenseNumber ?? 'خ 1234',
+        );
+      } else {
+        res = await _authApiService.registerCustomer(
+          name: name,
+          phone: phone,
+          email: email,
+          password: deterministicPassword,
+        );
       }
 
-      _currentUser = newUser;
-      
+      if (_isDisposed) return;
+
+      final user = res['user'] as UserModel;
+      await ApiClient().saveTokens(
+        accessToken: res['accessToken'],
+        refreshToken: res['refreshToken'],
+      );
+
+      _currentUser = user;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      if (_isDisposed) return;
-      
-      if (e.toString().contains('email-already-in-use') || e.toString().contains('already-in-use')) {
-        try {
-          final deterministicPassword = '$email$_secretSuffix';
-          final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-            email: email,
-            password: deterministicPassword,
-          );
-          if (_isDisposed) return;
-          final user = userCredential.user;
-          if (user != null) {
-            final newUser = UserModel(
-              id: user.uid,
-              name: name,
-              phone: phone,
-              email: email,
-              password: '',
-              role: role,
-              createdAt: DateTime.now(),
-            );
-            await _firestoreService.saveUser(newUser);
-            if (_isDisposed) return;
-
-            if (role == UserRole.merchant) {
-              final newStore = StoreModel(
-                id: 'store_${user.uid}', 
-                ownerId: user.uid,
-                name: 'مطعم $name',
-                type: StoreType.restaurant,
-                logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=400&auto=format&fit=crop',
-                phone: phone,
-                area: 'الخرطوم',
-                street: 'عام',
-                landmark: '',
-                latitude: 15.5,
-                longitude: 32.5,
-                openingTime: '08:00 AM',
-                closingTime: '11:00 PM',
-                preparationTime: '15 - 30 دقيقة',
-                minimumOrder: 2000,
-                deliveryFee: 1000,
-                status: 'active',
-                rating: 5.0,
-              );
-              await _firestoreService.saveStore(newStore);
-              if (_isDisposed) return;
-            }
-
-            _currentUser = newUser;
-            _isLoading = false;
-            notifyListeners();
-            return;
-          }
-        } catch (signInErr) {
-          debugPrint('Self-heal registration bypass failed: $signInErr');
-        }
-      }
-
       _isLoading = false;
       notifyListeners();
       throw Exception(e.toString());
@@ -351,13 +297,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _isLoading = true;
+    notifyListeners();
+
     try {
-      await _auth.signOut();
+      await _authApiService.logout();
     } catch (e) {
-      debugPrint('Error signing out: $e');
+      debugPrint('Error during backend logout: $e');
     }
+
     if (_isDisposed) return;
-    // FIX: clear ALL local auth state so no stale data leaks into the next session
     _currentUser = null;
     _generatedOtp = null;
     _pendingEmail = null;
@@ -368,10 +317,10 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> addSavedAddress(AddressModel address) async {
     if (_currentUser == null) return;
-    
+
     final updatedAddresses = List<AddressModel>.from(_currentUser!.savedAddresses ?? []);
     updatedAddresses.add(address);
-    
+
     _currentUser = UserModel(
       id: _currentUser!.id,
       name: _currentUser!.name,
@@ -384,11 +333,12 @@ class AuthProvider extends ChangeNotifier {
       fcmToken: _currentUser!.fcmToken,
       savedAddresses: updatedAddresses,
     );
-    
+
+    // Save to Firestore if firebase is active, wrap in try-catch so it never crashes
     try {
       await _firestoreService.saveUser(_currentUser!);
     } catch (e) {
-      debugPrint('Error saving user address: $e');
+      debugPrint('Error syncing user address: $e');
     }
     if (_isDisposed) return;
     notifyListeners();
