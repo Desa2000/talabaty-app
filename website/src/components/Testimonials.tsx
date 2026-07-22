@@ -18,7 +18,7 @@ export default function Testimonials() {
         ? "التوصيل كان سريع جدًا والوجبة وصلت ساخنة وبحالة ممتازة. تطبيق طلباتي غير مفهوم التوصيل في السودان!"
         : "Delivery was extremely fast and the food arrived hot and fresh. Talabaty changed the delivery experience in Sudan!",
       rating: 5,
-      tag: isRTL ? "طلب مطاعم 🍔" : "Food Order 🍔",
+      tag: isRTL ? "طلب مطاعم" : "Food Order",
       bg: "bg-orange-50/50",
       borderColor: "border-orange-100",
     },
@@ -29,7 +29,7 @@ export default function Testimonials() {
         ? "أطلب مقاضي البيت والأدوية الصيدلانية بضغطة زر وتوصل في وقت قياسي. خدمة موثوقة ومريحة للغاية."
         : "I order groceries and pharmacy items in one click and they arrive in record time. Highly reliable and convenient.",
       rating: 5,
-      tag: isRTL ? "مقاضي وصيدلية 🛒" : "Grocery & Pharmacy 🛒",
+      tag: isRTL ? "مقاضي وصيدلية" : "Grocery & Pharmacy",
       bg: "bg-emerald-50/50",
       borderColor: "border-emerald-100",
     },
@@ -40,7 +40,7 @@ export default function Testimonials() {
         ? "الانضمام لطلباتي زاد من مبيعاتنا بشكل ملحوظ ووفر لنا لوحة تحكم ممتازة لإدارة الطلبات مع المناديب."
         : "Joining Talabaty significantly increased our sales and provided us an excellent dashboard for order tracking.",
       rating: 5,
-      tag: isRTL ? "متجر شريك 🏪" : "Merchant Partner 🏪",
+      tag: isRTL ? "متجر شريك" : "Merchant Partner",
       bg: "bg-blue-50/50",
       borderColor: "border-blue-100",
     },
@@ -52,7 +52,7 @@ export default function Testimonials() {
         <FadeUp>
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="text-xs font-bold text-[#FF5722] bg-orange-50 px-3.5 py-1.5 rounded-full border border-orange-100 inline-block mb-3">
-              {isRTL ? "آراء عملائنا وشركائنا ⭐" : "Customer & Partner Reviews ⭐"}
+              {isRTL ? "آراء عملائنا وشركائنا" : "Customer & Partner Reviews"}
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-[#1A1D27] tracking-tight">
               {isRTL ? "ماذا يقول مستخدمو طلباتي؟" : "What Our Users Say About Talabaty"}

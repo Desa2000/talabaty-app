@@ -31,8 +31,8 @@ const translations: Record<Language, Record<string, string>> = {
     heroTitleMain: "أسرع.. أسهل.. أقرب",
     heroDescription:
       "اطلب من مطاعمك، سوبرماركتك وصيدليتك المفضلة، ونحن نوصلها ليك بسرعة وأمان في السودان.",
-    fastDeliveryBadge: "توصيل سريع ⚡",
-    trustedCouriersBadge: "مناديب موثوقون 🛵",
+    fastDeliveryBadge: "توصيل سريع",
+    trustedCouriersBadge: "مناديب موثوقون",
 
     // Services
     servicesTitle: "كل احتياجاتك في طلباتي",
@@ -131,8 +131,8 @@ const translations: Record<Language, Record<string, string>> = {
     heroTitleMain: "Faster.. Easier.. Closer",
     heroDescription:
       "Order from your favorite restaurants, supermarkets, and pharmacies, and we will deliver to you quickly and safely in Sudan.",
-    fastDeliveryBadge: "Fast Delivery ⚡",
-    trustedCouriersBadge: "Trusted Couriers 🛵",
+    fastDeliveryBadge: "Fast Delivery",
+    trustedCouriersBadge: "Trusted Couriers",
 
     // Services
     servicesTitle: "Everything You Need on Talabaty",

@@ -7,41 +7,43 @@ import { FadeUp, StaggerContainer, StaggerChild } from "@/components/motion/Anim
 import { motion } from "framer-motion";
 
 export default function FoundersSection() {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isRTL = lang === "ar";
 
   const founders = [
     {
-      name: isRTL ? "مازن حسن النعيم" : "Mazen Hassan Alnaeem",
+      name: isRTL ? "مازن محمد حسن النعيم" : "Mazen Mohamed Hassan Alnaeem",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
       image: "/founders/mazen-hassan-alnaeem.jpg",
+      objectPos: "object-center",
     },
     {
       name: isRTL ? "المدثر عامر الفاضل" : "Almodther Amer Alfadel",
       role: isRTL ? "مؤسس مشارك" : "Co-Founder",
-      image: "/founders/almodther-amer-alfadel.png",
+      image: "/founders/almodther-amer-alfadel.jpg",
+      objectPos: "object-center",
     },
   ];
 
   return (
     <section id="founders" className="py-20 bg-[#FAF7F2] relative overflow-hidden">
-      {/* Brand Watermark Background */}
+      {/* Subtle Brand Watermark in Background */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none overflow-hidden">
         <Image
           src="/logo.png"
           alt="Talabaty Watermark"
-          width={600}
-          height={600}
+          width={550}
+          height={550}
           className="object-contain filter grayscale"
         />
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
         <FadeUp>
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="text-xs font-bold text-[#FF5722] bg-orange-100/80 px-3.5 py-1.5 rounded-full border border-orange-200/80 inline-block mb-3">
-              {isRTL ? "فريق العمل 🇸🇩" : "Leadership Team 🇸🇩"}
+            <span className="text-xs font-bold text-[#FF5722] bg-orange-100/80 px-4 py-1.5 rounded-full border border-orange-200/80 inline-block mb-3">
+              {isRTL ? "فريق القيادة" : "Leadership Team"}
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-[#1A1D27] tracking-tight mb-3">
               {isRTL ? "مؤسسو طلباتي" : "Talabaty Founders"}
@@ -55,38 +57,38 @@ export default function FoundersSection() {
         </FadeUp>
 
         {/* Founders Cards Grid (Desktop: 2 side-by-side, Mobile: stacked) */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {founders.map((founder, idx) => (
             <StaggerChild key={idx}>
               <motion.div
-                whileHover={{ y: -5, boxShadow: "0 20px 40px -15px rgba(255, 87, 34, 0.15)" }}
-                className="bg-white rounded-3xl p-6 border border-[#F0EAE1] hover:border-[#FF5722]/40 shadow-sm transition-all duration-300 flex flex-col items-center text-center group"
+                whileHover={{ y: -4, boxShadow: "0 20px 40px -15px rgba(255, 87, 34, 0.12)" }}
+                className="bg-white rounded-3xl p-6 sm:p-8 border border-orange-100 hover:border-[#FF5722]/40 shadow-sm transition-all duration-300 flex flex-col items-center text-center group"
               >
-                {/* Photo Frame */}
-                <div className="relative w-48 h-48 sm:w-56 sm:h-56 mb-6 rounded-2xl overflow-hidden border-2 border-orange-100 group-hover:border-[#FF5722] transition-colors duration-300 shadow-md">
+                {/* Photo Container - Professional Portrait Aspect Ratio */}
+                <div className="relative w-full aspect-[4/4.5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-100 group-hover:border-[#FF5722]/50 transition-colors duration-300 shadow-md">
                   <motion.div
                     initial={{ scale: 0.97 }}
                     whileInView={{ scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.5 }}
-                    className="w-full h-full"
+                    transition={{ duration: 0.5, delay: idx * 0.15 }}
+                    className="w-full h-full relative"
                   >
                     <Image
                       src={founder.image}
                       alt={founder.name}
                       fill
-                      sizes="(max-width: 768px) 192px, 224px"
-                      className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                      sizes="(max-width: 768px) 280px, 320px"
+                      className={`object-cover ${founder.objectPos} group-hover:scale-105 transition-transform duration-500`}
                       priority={idx === 0}
                     />
                   </motion.div>
                 </div>
 
-                {/* Info */}
-                <h3 className="text-xl sm:text-2xl font-bold text-[#1A1D27] mb-1.5">
+                {/* Name & Role */}
+                <h3 className="text-xl sm:text-2xl font-bold text-[#1A1D27] mb-2">
                   {founder.name}
                 </h3>
-                <span className="inline-block px-3 py-1 rounded-full bg-orange-50 text-[#FF5722] text-xs font-bold border border-orange-100">
+                <span className="inline-block px-3.5 py-1 rounded-full bg-orange-50 text-[#FF5722] text-xs font-bold border border-orange-100">
                   {founder.role}
                 </span>
               </motion.div>

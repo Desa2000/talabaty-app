@@ -2,9 +2,9 @@
 
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import StatsSection from "@/components/StatsSection";
 import Services from "@/components/Services";
 import HowItWorks from "@/components/HowItWorks";
+import CoverageMapSection from "@/components/CoverageMapSection";
 import MerchantSection from "@/components/MerchantSection";
 import CourierSection from "@/components/CourierSection";
 import BenefitsSection from "@/components/BenefitsSection";
@@ -22,9 +22,9 @@ export default function HomePage() {
       <Navbar />
       <main className="flex-grow">
         <Hero />
-        <StatsSection />
         <Services />
         <HowItWorks />
+        <CoverageMapSection />
         <MerchantSection />
         <CourierSection />
         <BenefitsSection />
