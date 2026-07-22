@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { PerspectiveCamera, useTexture } from "@react-three/drei";
+import { PerspectiveCamera, useTexture, Sparkles } from "@react-three/drei";
 import * as THREE from "three";
 
 // ──────────────────────────────────────────────
@@ -10,6 +10,9 @@ import * as THREE from "three";
 // ──────────────────────────────────────────────
 function HeroScene({ scrollProgress }: { scrollProgress: number }) {
   const groupRef = useRef<THREE.Group>(null);
+  const layer1Ref = useRef<THREE.Mesh>(null);
+  const layer2Ref = useRef<THREE.Mesh>(null);
+  const layer3Ref = useRef<THREE.Mesh>(null);
 
   // Load optimized textures
   const bgTexture = useTexture("/experience/hero/sudan-city-background.webp");
@@ -30,43 +33,82 @@ function HeroScene({ scrollProgress }: { scrollProgress: number }) {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return;
 
-    // 1. Mouse Parallax target rotations (Max 0.03 radians)
-    const targetRotY = mouse.current.x * 0.03;
-    const targetRotX = -mouse.current.y * 0.03;
+    // High precision time delta for smooth lerping
+    const dt = Math.min(delta, 0.1);
+
+    // 1. Mouse Parallax target rotations (Max 0.05 radians)
+    const targetRotY = mouse.current.x * 0.05;
+    const targetRotX = -mouse.current.y * 0.05;
 
     // Smooth spring interpolation (lerp)
-    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, 0.05);
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, 0.05);
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, dt * 5);
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, dt * 5);
 
-    // 2. Scroll-linked camera depth movement
+    // 2. Multi-depth Parallax Layering for extra Lusion-style depth
+    if (layer1Ref.current) {
+        layer1Ref.current.position.x = THREE.MathUtils.lerp(layer1Ref.current.position.x, mouse.current.x * -0.2, dt * 3);
+        layer1Ref.current.position.y = THREE.MathUtils.lerp(layer1Ref.current.position.y, mouse.current.y * 0.2, dt * 3);
+    }
+    if (layer2Ref.current) {
+        layer2Ref.current.position.x = THREE.MathUtils.lerp(layer2Ref.current.position.x, mouse.current.x * 0.1, dt * 4);
+        layer2Ref.current.position.y = THREE.MathUtils.lerp(layer2Ref.current.position.y, mouse.current.y * -0.1, dt * 4);
+    }
+    if (layer3Ref.current) {
+        layer3Ref.current.position.x = THREE.MathUtils.lerp(layer3Ref.current.position.x, mouse.current.x * 0.3, dt * 5);
+        layer3Ref.current.position.y = THREE.MathUtils.lerp(layer3Ref.current.position.y, mouse.current.y * -0.3, dt * 5);
+    }
+
+    // 3. Scroll-linked camera depth movement
     // 0% -> 100% scroll shifts camera Z and Group position smoothly
-    const scrollZOffset = scrollProgress * 1.5;
-    const scrollYOffset = scrollProgress * 1.2;
+    const scrollZOffset = scrollProgress * 2.5;
+    const scrollYOffset = scrollProgress * 1.5;
 
-    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, 5 + scrollZOffset, 0.08);
-    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, -scrollYOffset, 0.08);
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, 5 + scrollZOffset, dt * 4);
+    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, -scrollYOffset, dt * 4);
   });
 
   return (
     <group ref={groupRef}>
       
       {/* Layer 1 (Background Scene): z = -4 */}
-      <mesh position={[0, 0, -4]}>
-        <planeGeometry args={[9, 9]} />
-        <meshBasicMaterial map={bgTexture} transparent opacity={0.35} />
+      <mesh ref={layer1Ref} position={[0, 0, -4]}>
+        <planeGeometry args={[12, 12]} />
+        <meshBasicMaterial map={bgTexture} transparent opacity={0.35} depthWrite={false} />
       </mesh>
+
+      {/* Ambient Floating Particles */}
+      <Sparkles 
+        count={80} 
+        scale={10} 
+        size={2} 
+        speed={0.4} 
+        opacity={0.15} 
+        color="#FF8A65" 
+        position={[0, 0, -3]} 
+      />
 
       {/* Layer 2 (Atmospheric Radial Glow): z = -2.5 */}
-      <mesh position={[0, 0, -2.5]}>
-        <planeGeometry args={[7, 7]} />
-        <meshBasicMaterial transparent opacity={0.25} color="#FF5722" />
+      <mesh ref={layer2Ref} position={[0, 0, -2.5]}>
+        <planeGeometry args={[8, 8]} />
+        <meshBasicMaterial transparent opacity={0.25} color="#FF5722" depthWrite={false} />
       </mesh>
 
+      {/* Extra Atmospheric Particles foreground */}
+      <Sparkles 
+        count={40} 
+        scale={6} 
+        size={3} 
+        speed={0.6} 
+        opacity={0.2} 
+        color="#FFCCBC" 
+        position={[0, 0, -1]} 
+      />
+
       {/* Layer 3 (Customer Phone Visual): z = 0 */}
-      <mesh position={[0, -0.1, 0]}>
+      <mesh ref={layer3Ref} position={[0, -0.1, 0]}>
         <planeGeometry args={[2.2, 3.8]} />
         <meshBasicMaterial map={phoneTexture} transparent />
       </mesh>

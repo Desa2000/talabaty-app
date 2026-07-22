@@ -242,3 +242,73 @@ export function TiltVisual({
     </motion.div>
   );
 }
+
+// ──────────────────────────────────────────────
+// Premium Magnetic Hover Micro-Interaction
+// ──────────────────────────────────────────────
+export function MagneticElement({ children, className = "", strength = 15 }: { children: ReactNode, className?: string, strength?: number }) {
+  const [isDesktop, setIsDesktop] = useState(false);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const springX = useSpring(x, MOTION_TOKENS.SPRING);
+  const springY = useSpring(y, MOTION_TOKENS.SPRING);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
+    setIsDesktop(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, []);
+
+  if (!isDesktop) {
+    return <div className={className}>{children}</div>;
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    x.set(((e.clientX - centerX) / rect.width) * strength);
+    y.set(((e.clientY - centerY) / rect.height) * strength);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.div
+      style={{ x: springX, y: springY }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// High-Precision Reveal for Micro-Interactions
+// ──────────────────────────────────────────────
+export function RevealMicro({ children, delay = 0, className = "" }: { children: ReactNode, delay?: number, className?: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, filter: "blur(4px)", y: 10 }}
+      whileInView={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+      viewport={{ once: true, margin: "-10px" }}
+      transition={{
+        duration: MOTION_TOKENS.SLOW,
+        delay,
+        ease: MOTION_TOKENS.EASE_PREMIUM,
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+

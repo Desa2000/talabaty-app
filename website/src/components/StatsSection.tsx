@@ -47,8 +47,8 @@ export default function StatsSection() {
   ];
 
   const cities = isRTL
-    ? ["الخرطوم 📍", "أم درمان 📍", "بحري 📍", "بورتسودان 📍", "ود مدني 📍", "عطبرة 📍", "كسلا 📍", "القضارف 📍"]
-    : ["Khartoum 📍", "Omdurman 📍", "Bahri 📍", "Port Sudan 📍", "Wad Madani 📍", "Atbara 📍", "Kassala 📍", "Gedaref 📍"];
+    ? ["الخرطوم ", "أم درمان ", "بحري ", "بورتسودان ", "ود مدني ", "عطبرة ", "كسلا ", "القضارف "]
+    : ["Khartoum ", "Omdurman ", "Bahri ", "Port Sudan ", "Wad Madani ", "Atbara ", "Kassala ", "Gedaref "];
 
   return (
     <section className="py-16 bg-[#FAF7F2] border-y border-[#F0EAE1] overflow-hidden">

@@ -82,7 +82,7 @@ export default function CourierSection() {
                     {features.map((feat, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-3 bg-gray-800/60 p-3.5 rounded-2xl border border-gray-700/60"
+                        className="flex items-center gap-3 bg-gray-800/40 backdrop-blur-md p-3.5 rounded-2xl border border-gray-700/50 shadow-lg"
                       >
                         <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                         <span className="text-sm font-bold text-gray-200">{feat}</span>

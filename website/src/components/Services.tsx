@@ -77,7 +77,7 @@ export default function Services() {
                 <motion.div
                   whileHover={{ y: -4, boxShadow: "0 20px 40px -10px rgba(255, 87, 34, 0.08)" }}
                   transition={{ duration: MOTION_TOKENS.FAST }}
-                  className={`bg-[#FAF7F2]/80 rounded-3xl overflow-hidden border ${service.borderColor} shadow-xs transition-all duration-300 flex flex-col justify-between h-full group`}
+                  className={`bg-white/70 backdrop-blur-xl rounded-3xl overflow-hidden border border-white/40 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col justify-between h-full group`}
                 >
                   <div>
                     {/* Top Commercial Photography Image */}

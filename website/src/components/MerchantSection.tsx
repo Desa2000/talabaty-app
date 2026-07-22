@@ -36,7 +36,7 @@ export default function MerchantSection() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="bg-[#FAF7F2]/80 rounded-[36px] p-8 sm:p-12 lg:p-16 border border-[#F0EAE1] shadow-xs relative overflow-hidden">
+        <div className="bg-white/70 backdrop-blur-2xl rounded-[36px] p-8 sm:p-12 lg:p-16 border border-white/40 shadow-2xl relative overflow-hidden">
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             
@@ -64,7 +64,7 @@ export default function MerchantSection() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 w-full">
                   {features.map((feat, idx) => (
                     <StaggerChild key={idx}>
-                      <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs">
+                      <div className="flex items-center gap-3 bg-white/60 backdrop-blur-md p-3.5 rounded-2xl border border-white/50 shadow-md">
                         <CheckCircle className="w-5 h-5 text-[#FF5722] flex-shrink-0" />
                         <span className="text-sm font-bold text-[#1A1D27]">{feat}</span>
                       </div>
@@ -98,7 +98,7 @@ export default function MerchantSection() {
                 {/* Soft Orange Glow Behind Image */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#FF5722]/15 rounded-full blur-2xl pointer-events-none -z-10" />
 
-                <div className="relative w-full bg-white rounded-3xl p-4 sm:p-6 border border-orange-100/90 shadow-xl shadow-orange-950/5 transition-all duration-300 overflow-hidden">
+                <div className="relative w-full bg-white/80 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/60 shadow-2xl transition-all duration-300 overflow-hidden">
                   <Image
                     src="/experience/merchant/merchant-dashboard.webp"
                     alt="Talabaty Merchant Dashboard Visual"

@@ -58,7 +58,7 @@ export default function FoundersSection() {
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {founders.map((founder, idx) => (
             <StaggerChild key={idx}>
-              <div className="bg-[#FAF7F2]/80 rounded-3xl p-6 sm:p-8 border border-orange-100/90 shadow-sm flex flex-col items-center text-center group transition-all duration-300 hover:border-orange-200">
+              <div className="bg-white/70 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/40 shadow-xl flex flex-col items-center text-center group transition-all duration-300 hover:border-orange-200">
                 
                 {/* Photo Container - Clean portrait aspect ratio (4/5) with rounded corners & subtle orange border */}
                 <div className="relative w-full aspect-[4/5] max-w-[280px] mb-6 rounded-2xl overflow-hidden border border-orange-200/80 shadow-md">

@@ -70,7 +70,7 @@ export default function HowItWorks() {
                 <motion.div 
                   whileHover={{ y: -3 }}
                   transition={{ duration: MOTION_TOKENS.FAST }}
-                  className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F0EAE1] hover:border-orange-200 shadow-xs transition-all duration-200 relative h-full flex flex-col justify-between"
+                  className="bg-white/70 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/40 hover:border-orange-300 shadow-xl hover:shadow-2xl hover:bg-white/90 transition-all duration-300 relative h-full flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-6">
@@ -97,16 +97,16 @@ export default function HowItWorks() {
 
         {/* Supported Payment Methods */}
         <FadeUp delay={0.3}>
-          <div className="mt-16 bg-white rounded-3xl p-6 sm:p-8 border border-[#F0EAE1] max-w-3xl mx-auto text-center shadow-xs">
+          <div className="mt-16 bg-white/70 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/40 max-w-3xl mx-auto text-center shadow-xl">
             <h4 className="text-base font-bold text-[#1A1D27] mb-4">
               {isRTL ? "طرق دفع مناسبة ومضمونة" : "Convenient & Secure Payment Methods"}
             </h4>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-2.5 px-5 py-2.5 bg-[#FAF7F2] rounded-2xl border border-gray-200 text-sm font-bold text-[#1A1D27]">
+              <div className="flex items-center gap-2.5 px-5 py-2.5 bg-white/60 backdrop-blur-lg rounded-2xl border border-white/50 shadow-md text-sm font-bold text-[#1A1D27]">
                 <Wallet className="w-4 h-4 text-[#FF5722]" />
                 <span>{isRTL ? "بنكك (Bankak)" : "Bankak"}</span>
               </div>
-              <div className="flex items-center gap-2.5 px-5 py-2.5 bg-[#FAF7F2] rounded-2xl border border-gray-200 text-sm font-bold text-[#1A1D27]">
+              <div className="flex items-center gap-2.5 px-5 py-2.5 bg-white/60 backdrop-blur-lg rounded-2xl border border-white/50 shadow-md text-sm font-bold text-[#1A1D27]">
                 <Banknote className="w-4 h-4 text-emerald-600" />
                 <span>{isRTL ? "الدفع عند الاستلام (كاش)" : "Cash on Delivery"}</span>
               </div>
