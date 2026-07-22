@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { ChevronDown, HelpCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { FadeUp, StaggerContainer, StaggerChild } from "@/components/motion/Animations";
 
 export default function FaqSection() {
   const { t } = useLanguage();
@@ -52,7 +54,7 @@ export default function FaqSection() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <FadeUp className="text-center mb-16">
           <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-orange-100 text-[#FF5722] text-xs font-bold mb-4">
             <HelpCircle className="w-4 h-4" />
             <span>إجابات على تساؤلاتك</span>
@@ -60,36 +62,52 @@ export default function FaqSection() {
           <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1A1D27] tracking-tight">
             {t("faq")}
           </h2>
-        </div>
+        </FadeUp>
 
         {/* Accordion List */}
-        <div className="space-y-4">
+        <StaggerContainer className="space-y-4">
           {faqs.map((faq, idx) => {
             const isOpen = openIndex === idx;
             return (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl border border-[#F0EAE1] overflow-hidden shadow-card transition-all"
-              >
-                <button
-                  onClick={() => toggleFaq(idx)}
-                  className="w-full px-6 py-5 text-right flex items-center justify-between gap-4 font-bold text-base sm:text-lg text-[#1A1D27] hover:text-[#FF5722] transition-colors"
+              <StaggerChild key={idx}>
+                <motion.div
+                  className="bg-white rounded-2xl border border-[#F0EAE1] overflow-hidden shadow-card"
+                  whileHover={!isOpen ? { y: -2 } : { y: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                 >
-                  <span>{faq.q}</span>
-                  <div className={`w-8 h-8 rounded-xl bg-orange-50 text-[#FF5722] flex items-center justify-center transition-transform duration-300 ${isOpen ? "rotate-180 bg-[#FF5722] text-white" : ""}`}>
-                    <ChevronDown className="w-5 h-5" />
-                  </div>
-                </button>
+                  <button
+                    onClick={() => toggleFaq(idx)}
+                    className="w-full px-6 py-5 text-right flex items-center justify-between gap-4 font-bold text-base sm:text-lg text-[#1A1D27] hover:text-[#FF5722] transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <motion.div 
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${isOpen ? "bg-[#FF5722] text-white" : "bg-orange-50 text-[#FF5722]"}`}
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <ChevronDown className="w-5 h-5" />
+                    </motion.div>
+                  </button>
 
-                {isOpen && (
-                  <div className="px-6 pb-6 pt-2 text-sm font-medium text-gray-600 leading-relaxed border-t border-gray-100/80 animate-in fade-in duration-200">
-                    {faq.a}
-                  </div>
-                )}
-              </div>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                      >
+                        <div className="px-6 pb-6 pt-2 text-sm font-medium text-gray-600 leading-relaxed border-t border-gray-100/80">
+                          {faq.a}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </StaggerChild>
             );
           })}
-        </div>
+        </StaggerContainer>
 
       </div>
     </section>

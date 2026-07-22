@@ -67,3 +67,29 @@ html {
 .shadow-card-hover {
   box-shadow: 0 20px 40px -15px rgba(255, 87, 34, 0.12);
 }
+
+/* ─── Button Micro-Interactions ─── */
+button,
+a[role="button"],
+.btn {
+  transition: transform 0.15s ease, box-shadow 0.25s ease, background-color 0.2s ease;
+}
+
+/* ─── Input Focus Glow ─── */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.1);
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

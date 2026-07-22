@@ -1,3 +1,5 @@
+"use client";
+
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Services from "@/components/Services";
@@ -8,10 +10,12 @@ import BenefitsSection from "@/components/BenefitsSection";
 import DownloadSection from "@/components/DownloadSection";
 import FaqSection from "@/components/FaqSection";
 import Footer from "@/components/Footer";
+import ScrollProgress from "@/components/motion/ScrollProgress";
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
+      <ScrollProgress />
       <Navbar />
       <main className="flex-grow">
         <Hero />
