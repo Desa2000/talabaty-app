@@ -47,6 +47,10 @@ import {
   deleteAddress,
 } from './modules/address/address.controller';
 import {
+  computeRouteHandler,
+  calculateDeliveryFeeHandler,
+} from './modules/routing/routing.controller';
+import {
   updateCourierLocation,
   updateCourierStatus,
 } from './modules/courier/courier.controller';
@@ -145,8 +149,10 @@ app.post('/api/merchant/products', authenticate, authorizeRoles('MERCHANT', 'ADM
 app.put('/api/merchant/products/:id', authenticate, authorizeRoles('MERCHANT', 'ADMIN', 'SUPER_ADMIN'), updateProduct);
 app.delete('/api/merchant/products/:id', authenticate, authorizeRoles('MERCHANT', 'ADMIN', 'SUPER_ADMIN'), deleteProduct);
 
-// 4. Cart Route
+// 4. Cart & Routing Routes
 app.post('/api/cart/validate', validateCart);
+app.post('/api/routing/route', computeRouteHandler);
+app.post('/api/routing/delivery-fee', calculateDeliveryFeeHandler);
 
 // 5. Order Routes
 app.post('/api/orders', authenticate, createOrder);
