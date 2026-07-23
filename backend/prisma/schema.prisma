@@ -8,10 +8,14 @@ generator client {
 }
 
 enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATIONS
+  FINANCE
+  SUPPORT
   CUSTOMER
   MERCHANT
   COURIER
-  ADMIN
 }
 
 enum VehicleType {
@@ -81,6 +85,20 @@ enum PaymentStatus {
   BANKAK_SUBMITTED
   BANKAK_VERIFIED
   BANKAK_REJECTED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 model User {
@@ -303,6 +321,56 @@ model CourierLocationLog {
   createdAt DateTime @default(now())
 }
 
+model ServiceArea {
+  id                 String   @id @default(uuid())
+  state              String   // e.g. "ولاية الخرطوم"
+  locality           String   // e.g. "الخرطوم", "بحري", "أم درمان"
+  nameAr             String
+  nameEn             String?
+  isActive           Boolean  @default(true)
+  deliveryRadius     Float    @default(15.0) // km
+  minimumDeliveryFee Float    @default(500.0)
+  pricePerKm         Float    @default(200.0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model SupportTicket {
+  id              String         @id @default(uuid())
+  ticketNumber    String         @unique // e.g. TCK-1001
+  type            String         // "ORDER_ISSUE", "PAYMENT_ISSUE", "GENERAL"
+  priority        TicketPriority @default(MEDIUM)
+  status          TicketStatus   @default(OPEN)
+  description     String
+  customerId      String?
+  merchantId      String?
+  courierId       String?
+  orderId         String?
+  assignedAdminId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  resolvedAt      DateTime?
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String   // e.g. "ADMIN_APPROVED_MERCHANT", "ADMIN_CANCELLED_ORDER"
+  entityType String   // e.g. "MERCHANT", "ORDER", "COURIER", "PAYMENT", "COVERAGE"
+  entityId   String
+  beforeData String?
+  afterData  String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model PlatformSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model DeviceToken {
   id        String   @id @default(uuid())
   userId    String
@@ -321,4 +389,5 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
 

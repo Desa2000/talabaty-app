@@ -47,3 +47,8 @@ export const authorizeRoles = (...roles: string[]) => {
     return next();
   };
 };
+
+export const isAdminRole = (role?: string): boolean => {
+  if (!role) return false;
+  return ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS', 'FINANCE', 'SUPPORT'].includes(role);
+};

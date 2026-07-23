@@ -6,20 +6,74 @@ const prisma = new PrismaClient();
 async function main() {
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  // 1. Admin User
+  // 1. Super Admin & Admin Users
   await prisma.user.upsert({
     where: { phone: '0900000000' },
-    update: {},
+    update: { role: 'SUPER_ADMIN' },
     create: {
-      name: 'مدير النظام',
+      name: 'Super Admin - المدير العام',
       phone: '0900000000',
+      email: 'superadmin@talabaty.com',
+      passwordHash,
+      role: 'SUPER_ADMIN',
+      isVerified: true,
+      adminProfile: { create: {} },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { phone: '0900000001' },
+    update: { role: 'ADMIN' },
+    create: {
+      name: 'مدير عمليات النظام',
+      phone: '0900000001',
       email: 'admin@talabaty.com',
       passwordHash,
       role: 'ADMIN',
       isVerified: true,
-      adminProfile: {
-        create: {},
-      },
+      adminProfile: { create: {} },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { phone: '0900000002' },
+    update: { role: 'OPERATIONS' },
+    create: {
+      name: 'مسؤول العمليات',
+      phone: '0900000002',
+      email: 'ops@talabaty.com',
+      passwordHash,
+      role: 'OPERATIONS',
+      isVerified: true,
+      adminProfile: { create: {} },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { phone: '0900000003' },
+    update: { role: 'FINANCE' },
+    create: {
+      name: 'مسؤول المالية',
+      phone: '0900000003',
+      email: 'finance@talabaty.com',
+      passwordHash,
+      role: 'FINANCE',
+      isVerified: true,
+      adminProfile: { create: {} },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { phone: '0900000004' },
+    update: { role: 'SUPPORT' },
+    create: {
+      name: 'مسؤول الدعم الفني',
+      phone: '0900000004',
+      email: 'support@talabaty.com',
+      passwordHash,
+      role: 'SUPPORT',
+      isVerified: true,
+      adminProfile: { create: {} },
     },
   });
 
@@ -34,13 +88,10 @@ async function main() {
       passwordHash,
       role: 'CUSTOMER',
       isVerified: true,
-      customerProfile: {
-        create: {},
-      },
+      customerProfile: { create: {} },
     },
   });
 
-  // Seed default address for customer
   await prisma.address.create({
     data: {
       userId: customerUser.id,
@@ -55,7 +106,7 @@ async function main() {
     },
   });
 
-  # 3. Restaurant Merchant & Store
+  // 3. Restaurant Merchant & Store
   const restMerchant = await prisma.user.upsert({
     where: { phone: '0922345678' },
     update: {},
@@ -92,16 +143,13 @@ async function main() {
     },
     include: {
       merchantProfile: {
-        include: {
-          stores: true,
-        },
+        include: { stores: true },
       },
     },
   });
 
   const restStoreId = restMerchant.merchantProfile!.stores[0].id;
 
-  // Restaurant Categories & Products
   const burgerCategory = await prisma.productCategory.create({
     data: {
       storeId: restStoreId,
@@ -153,7 +201,7 @@ async function main() {
     ],
   });
 
-  # 4. Supermarket Merchant & Store
+  // 4. Supermarket Merchant & Store
   const superMerchant = await prisma.user.upsert({
     where: { phone: '0922345679' },
     update: {},
@@ -190,9 +238,7 @@ async function main() {
     },
     include: {
       merchantProfile: {
-        include: {
-          stores: true,
-        },
+        include: { stores: true },
       },
     },
   });
@@ -232,7 +278,7 @@ async function main() {
     ],
   });
 
-  # 5. Pharmacy Merchant & Store
+  // 5. Pharmacy Merchant & Store
   const pharmMerchant = await prisma.user.upsert({
     where: { phone: '0922345680' },
     update: {},
@@ -269,9 +315,7 @@ async function main() {
     },
     include: {
       merchantProfile: {
-        include: {
-          stores: true,
-        },
+        include: { stores: true },
       },
     },
   });
@@ -311,7 +355,7 @@ async function main() {
     ],
   });
 
-  # 6. Couriers
+  // 6. Couriers
   await prisma.user.upsert({
     where: { phone: '0932345678' },
     update: {},
@@ -362,7 +406,39 @@ async function main() {
     },
   });
 
-  console.log('Seeding completed successfully!');
+  // 7. Seed Service Areas (Khartoum State)
+  const areas = [
+    { state: 'ولاية الخرطوم', locality: 'الخرطوم', nameAr: 'محلية الخرطوم', nameEn: 'Khartoum Locality', isActive: true, deliveryRadius: 20.0, minimumDeliveryFee: 500.0, pricePerKm: 200.0 },
+    { state: 'ولاية الخرطوم', locality: 'بحري', nameAr: 'محلية بحري', nameEn: 'Bahri Locality', isActive: true, deliveryRadius: 18.0, minimumDeliveryFee: 500.0, pricePerKm: 200.0 },
+    { state: 'ولاية الخرطوم', locality: 'أم درمان', nameAr: 'محلية أم درمان', nameEn: 'Omdurman Locality', isActive: true, deliveryRadius: 22.0, minimumDeliveryFee: 500.0, pricePerKm: 200.0 },
+    { state: 'الجزيرة', locality: 'ود مدني', nameAr: 'محلية ود مدني (قريباً)', nameEn: 'Wad Madani', isActive: false, deliveryRadius: 15.0, minimumDeliveryFee: 600.0, pricePerKm: 250.0 },
+    { state: 'البحر الأحمر', locality: 'بورتسودان', nameAr: 'محلية بورتسودان (قريباً)', nameEn: 'Port Sudan', isActive: false, deliveryRadius: 15.0, minimumDeliveryFee: 600.0, pricePerKm: 250.0 },
+  ];
+
+  for (const area of areas) {
+    await prisma.serviceArea.create({ data: area });
+  }
+
+  // 8. Platform Settings
+  const settings = [
+    { key: 'accept_new_orders', value: 'true' },
+    { key: 'merchant_registration_enabled', value: 'true' },
+    { key: 'courier_registration_enabled', value: 'true' },
+    { key: 'maximum_order_radius_km', value: '25' },
+    { key: 'default_prep_time_minutes', value: '20' },
+    { key: 'support_phone', value: '0900000000' },
+    { key: 'support_email', value: 'support@mytalabaty.com' },
+  ];
+
+  for (const s of settings) {
+    await prisma.platformSetting.upsert({
+      where: { key: s.key },
+      update: { value: s.value },
+      create: s,
+    });
+  }
+
+  console.log('Admin Seeding completed successfully!');
 }
 
 main()
