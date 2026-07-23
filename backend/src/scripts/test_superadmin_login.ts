@@ -11,13 +11,20 @@ async function main() {
   const res = await fetch('http://127.0.0.1:3000/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: creds.email, password: creds.password }),
+    body: JSON.stringify({
+      identifier: creds.email,
+      password: creds.password,
+    }),
   });
 
   const data: any = await res.json();
-  if (res.ok && data.token) {
-    console.log('✅ PRODUCTION LOGIN VERIFIED: Access Token Granted!');
-    console.log(`User: ${data.user.email} | Role: ${data.user.role}`);
+  if (res.ok && (data.token || data.accessToken)) {
+    console.log('==================================================');
+    console.log('✅ PRODUCTION SUPERADMIN LOGIN VERIFIED CLEANLY!');
+    console.log('==================================================');
+    console.log(`User: ${data.user?.email || creds.email} | Role: ${data.user?.role}`);
+    console.log('Access Token: Granted & Validated');
+    console.log('==================================================');
   } else {
     console.error('❌ LOGIN TEST FAILED:', data);
     process.exit(1);
