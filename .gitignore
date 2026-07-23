@@ -3,6 +3,8 @@
 *.log
 *.pyc
 *.swp
+*.secure.json
+SUPERADMIN_ACCESS.secure.json
 .DS_Store
 .atom/
 .build/
