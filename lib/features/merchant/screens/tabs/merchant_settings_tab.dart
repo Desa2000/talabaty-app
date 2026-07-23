@@ -221,7 +221,7 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
       _nameController = TextEditingController(text: store.name);
       _ownerNameController = TextEditingController(text: merchantUser.name);
       _phoneController = TextEditingController(text: store.phone.isNotEmpty ? store.phone : merchantUser.phone);
-      _descController = TextEditingController(text: store.landmark ?? '');
+      _descController = TextEditingController(text: store.landmark);
       _openTimeController = TextEditingController(text: store.openingTime);
       _closeTimeController = TextEditingController(text: store.closingTime);
       _prepTimeController = TextEditingController(text: store.preparationTime);

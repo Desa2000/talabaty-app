@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { adminFetch } from '@/lib/admin-api';
 import { MapPin, RefreshCw, Edit2, CheckCircle2 } from 'lucide-react';
+import AdminMap from '@/components/admin/AdminMap';
 
 export default function AdminCoveragePage() {
   const [areas, setAreas] = useState<any[]>([]);
@@ -65,6 +66,9 @@ export default function AdminCoveragePage() {
           <span>تحديث المناطق</span>
         </button>
       </div>
+
+      {/* Branded Talabaty Coverage Map */}
+      <AdminMap showCoverage={true} height="360px" />
 
       {/* Coverage Areas Table */}
       <div className="bg-[#16191D] rounded-2xl border border-gray-800 overflow-hidden">
