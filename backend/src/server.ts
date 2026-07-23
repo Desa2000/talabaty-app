@@ -8,6 +8,7 @@ import {
   registerMerchant,
   registerCourier,
   login,
+  changePassword,
   refresh,
   logout,
   getMe,
@@ -73,6 +74,29 @@ import {
 } from './modules/admin/admin.controller';
 import { authenticate, authorizeRoles } from './middleware/auth.middleware';
 
+// IP Rate Limiting for Login Protection
+const loginIpAttempts = new Map<string, { count: number; resetTime: number }>();
+
+const loginRateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes window
+  const maxAttempts = 10;
+
+  const attempt = loginIpAttempts.get(ip);
+  if (!attempt || now > attempt.resetTime) {
+    loginIpAttempts.set(ip, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+
+  if (attempt.count >= maxAttempts) {
+    return res.status(429).json({ error: 'تم تجاوز الحد المسموح من محاولات الدخول، يرجى الانتظار 15 دقيقة' });
+  }
+
+  attempt.count += 1;
+  return next();
+};
+
 const app = express();
 export const server = http.createServer(app);
 
@@ -101,7 +125,8 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/register/customer', registerCustomer);
 app.post('/api/auth/register/merchant', registerMerchant);
 app.post('/api/auth/register/courier', registerCourier);
-app.post('/api/auth/login', login);
+app.post('/api/auth/login', loginRateLimiter, login);
+app.post('/api/auth/change-password', authenticate, changePassword);
 app.post('/api/auth/refresh', refresh);
 app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', authenticate, getMe);

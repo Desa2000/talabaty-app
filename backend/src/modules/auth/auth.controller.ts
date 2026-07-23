@@ -5,19 +5,20 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../../utils/prisma';
 import { config } from '../../config';
+import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 
 // JWT Helper functions
-const generateAccessToken = (user: { id: string; role: string; email: string | null; phone: string }) => {
+const generateAccessToken = (user: { id: string; role: string; email: string | null; phone: string; tokenVersion: number }) => {
   return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email, phone: user.phone },
+    { sub: user.id, role: user.role, email: user.email, phone: user.phone, tokenVersion: user.tokenVersion },
     config.jwtAccessSecret,
     { expiresIn: config.jwtAccessExpiresIn as any }
   );
 };
 
-const generateRefreshToken = (userId: string) => {
+const generateRefreshToken = (userId: string, tokenVersion: number) => {
   return jwt.sign(
-    { sub: userId },
+    { sub: userId, v: tokenVersion },
     config.jwtRefreshSecret,
     { expiresIn: config.jwtRefreshExpiresIn as any }
   );
@@ -32,14 +33,14 @@ const registerCustomerSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(6),
   email: z.string().email().optional().or(z.literal('')),
-  password: z.string().min(4),
+  password: z.string().min(6),
 });
 
 const registerMerchantSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(6),
   email: z.string().email().optional().or(z.literal('')),
-  password: z.string().min(4),
+  password: z.string().min(6),
   businessName: z.string().min(2),
   businessDescription: z.string().optional(),
   businessArea: z.string().optional(),
@@ -54,15 +55,20 @@ const registerCourierSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(6),
   email: z.string().email().optional().or(z.literal('')),
-  password: z.string().min(4),
+  password: z.string().min(6),
   vehicleType: z.enum(['BICYCLE', 'ELECTRIC_BICYCLE', 'MOTORCYCLE']),
   idNumber: z.string().min(2),
   licenseNumber: z.string().optional().or(z.literal('')),
 });
 
 const loginSchema = z.object({
-  identifier: z.string().min(3), // phone or email
+  identifier: z.string().min(3),
   password: z.string().min(4),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(4),
+  newPassword: z.string().min(8),
 });
 
 export const registerCustomer = async (req: Request, res: Response) => {
@@ -70,7 +76,6 @@ export const registerCustomer = async (req: Request, res: Response) => {
     const validated = registerCustomerSchema.parse(req.body);
     const emailVal = validated.email && validated.email !== '' ? validated.email : null;
 
-    // Check duplicates
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
@@ -84,7 +89,7 @@ export const registerCustomer = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'رقم الهاتف أو البريد الإلكتروني مسجل بالفعل' });
     }
 
-    const passwordHash = await bcrypt.hash(validated.password, 10);
+    const passwordHash = await bcrypt.hash(validated.password, 12);
 
     const user = await prisma.user.create({
       data: {
@@ -94,19 +99,16 @@ export const registerCustomer = async (req: Request, res: Response) => {
         passwordHash,
         role: 'CUSTOMER',
         isVerified: true,
-        customerProfile: {
-          create: {},
-        },
+        customerProfile: { create: {} },
       },
     });
 
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
     const tokenHash = hashToken(refreshToken);
 
-    // Save refresh token
     const refreshExpiry = new Date();
-    refreshExpiry.setDate(refreshExpiry.getDate() + 30); // 30 days
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
     await prisma.refreshToken.create({
       data: {
         userId: user.id,
@@ -133,7 +135,6 @@ export const registerMerchant = async (req: Request, res: Response) => {
     const validated = registerMerchantSchema.parse(req.body);
     const emailVal = validated.email && validated.email !== '' ? validated.email : null;
 
-    // Check duplicates
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
@@ -147,9 +148,8 @@ export const registerMerchant = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'رقم الهاتف أو البريد الإلكتروني مسجل بالفعل' });
     }
 
-    const passwordHash = await bcrypt.hash(validated.password, 10);
+    const passwordHash = await bcrypt.hash(validated.password, 12);
 
-    // Create user, profile and store atomically
     const user = await prisma.user.create({
       data: {
         name: validated.name,
@@ -176,17 +176,10 @@ export const registerMerchant = async (req: Request, res: Response) => {
           },
         },
       },
-      include: {
-        merchantProfile: {
-          include: {
-            stores: true,
-          },
-        },
-      },
     });
 
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
     const tokenHash = hashToken(refreshToken);
 
     const refreshExpiry = new Date();
@@ -217,7 +210,6 @@ export const registerCourier = async (req: Request, res: Response) => {
     const validated = registerCourierSchema.parse(req.body);
     const emailVal = validated.email && validated.email !== '' ? validated.email : null;
 
-    // Check duplicates
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
@@ -231,7 +223,7 @@ export const registerCourier = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'رقم الهاتف أو البريد الإلكتروني مسجل بالفعل' });
     }
 
-    const passwordHash = await bcrypt.hash(validated.password, 10);
+    const passwordHash = await bcrypt.hash(validated.password, 12);
 
     const user = await prisma.user.create({
       data: {
@@ -252,7 +244,7 @@ export const registerCourier = async (req: Request, res: Response) => {
     });
 
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
     const tokenHash = hashToken(refreshToken);
 
     const refreshExpiry = new Date();
@@ -291,21 +283,54 @@ export const login = async (req: Request, res: Response) => {
       },
     });
 
+    // Generic error message for timing & enumeration resistance
+    const invalidCredsMsg = 'بيانات الدخول غير صحيحة';
+
     if (!user) {
-      return res.status(401).json({ error: 'رقم الهاتف/البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+      return res.status(401).json({ error: invalidCredsMsg });
     }
 
-    const isMatch = await bcrypt.compare(validated.password, user.passwordHash);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'رقم الهاتف/البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+    // Check account lockout
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      const remainingMinutes = Math.ceil((user.lockoutUntil.getTime() - Date.now()) / 60000);
+      return res.status(429).json({
+        error: `الحساب مقفل مؤقتاً لعدة محاولات فاشلة. يرجى المحاولة بعد ${remainingMinutes} دقيقة`,
+      });
     }
 
     if (!user.isActive) {
       return res.status(403).json({ error: 'هذا الحساب معطل حالياً' });
     }
 
+    const isMatch = await bcrypt.compare(validated.password, user.passwordHash);
+    if (!isMatch) {
+      const failedCount = user.failedLoginAttempts + 1;
+      const lockoutData: any = { failedLoginAttempts: failedCount };
+
+      if (failedCount >= 5) {
+        const lockoutTime = new Date();
+        lockoutTime.setMinutes(lockoutTime.getMinutes() + 15); // 15-minute temporary lockout
+        lockoutData.lockoutUntil = lockoutTime;
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: lockoutData,
+      });
+
+      return res.status(401).json({ error: invalidCredsMsg });
+    }
+
+    // On successful login, reset failed attempts & lockout
+    if (user.failedLoginAttempts > 0 || user.lockoutUntil !== null) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockoutUntil: null },
+      });
+    }
+
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
     const tokenHash = hashToken(refreshToken);
 
     const refreshExpiry = new Date();
@@ -319,15 +344,88 @@ export const login = async (req: Request, res: Response) => {
     });
 
     return res.json({
-      user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        forcePasswordChange: user.forcePasswordChange,
+      },
       accessToken,
       refreshToken,
+      requirePasswordChange: user.forcePasswordChange,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'البيانات المدخلة غير صالحة', details: error.errors });
     }
     return res.status(500).json({ error: error.message || 'حدث خطأ أثناء تسجيل الدخول' });
+  }
+};
+
+// CHANGE PASSWORD & REVOKE ALL SESSIONS
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthenticatedRequest).user?.id!;
+    const validated = changePasswordSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    const isMatch = await bcrypt.compare(validated.currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+    }
+
+    const newPasswordHash = await bcrypt.hash(validated.newPassword, 12);
+    const newVersion = user.tokenVersion + 1;
+
+    // Update password, reset forcePasswordChange, increment tokenVersion (invalidates all active JWT tokens)
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        tokenVersion: newVersion,
+        forcePasswordChange: false,
+        passwordChangedAt: new Date(),
+      },
+    });
+
+    // Revoke all refresh tokens for this user in DB
+    await prisma.refreshToken.updateMany({
+      where: { userId },
+      data: { revoked: true },
+    });
+
+    // Generate new fresh token for current session
+    const updatedUser = { ...user, tokenVersion: newVersion };
+    const newAccessToken = generateAccessToken(updatedUser);
+    const newRefreshToken = generateRefreshToken(userId, newVersion);
+    const tokenHash = hashToken(newRefreshToken);
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+    await prisma.refreshToken.create({
+      data: {
+        userId,
+        tokenHash,
+        expiresAt: refreshExpiry,
+      },
+    });
+
+    return res.json({
+      message: 'تم تغيير كلمة المرور وإلغاء كافة الجلسات الأخرى بنجاح',
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل', details: error.errors });
+    }
+    return res.status(500).json({ error: error.message || 'فشل تغيير كلمة المرور' });
   }
 };
 
@@ -338,11 +436,9 @@ export const refresh = async (req: Request, res: Response) => {
   }
 
   try {
-    // Decode and verify refresh token
-    const decoded = jwt.verify(refreshToken, config.jwtRefreshSecret) as { sub: string };
+    const decoded = jwt.verify(refreshToken, config.jwtRefreshSecret) as { sub: string; v?: number };
     const tokenHash = hashToken(refreshToken);
 
-    // Look up refresh token in database
     const dbToken = await prisma.refreshToken.findUnique({
       where: { tokenHash },
     });
@@ -351,13 +447,12 @@ export const refresh = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Refresh token invalid or expired' });
     }
 
-    // Retrieve user
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
     });
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'User is inactive or not found' });
+    if (!user || !user.isActive || (decoded.v !== undefined && decoded.v !== user.tokenVersion)) {
+      return res.status(401).json({ error: 'User session has been revoked' });
     }
 
     const newAccessToken = generateAccessToken(user);
@@ -379,7 +474,6 @@ export const logout = async (req: Request, res: Response) => {
   try {
     const tokenHash = hashToken(refreshToken);
 
-    // Revoke token in DB
     await prisma.refreshToken.updateMany({
       where: { tokenHash },
       data: { revoked: true },
@@ -408,6 +502,7 @@ export const getMe = async (req: Request, res: Response) => {
         role: true,
         isVerified: true,
         isActive: true,
+        forcePasswordChange: true,
         createdAt: true,
       },
     });

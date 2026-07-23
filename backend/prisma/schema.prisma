@@ -108,10 +108,15 @@ model User {
   email           String?          @unique
   passwordHash    String
   role            UserRole
-  isVerified      Boolean          @default(false)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  isVerified           Boolean          @default(false)
+  isActive             Boolean          @default(true)
+  forcePasswordChange  Boolean          @default(false)
+  failedLoginAttempts  Int              @default(0)
+  lockoutUntil         DateTime?
+  tokenVersion         Int              @default(1)
+  passwordChangedAt    DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   customerProfile CustomerProfile?
   merchantProfile MerchantProfile?
