@@ -22,8 +22,22 @@ enum VehicleType {
 
 enum CourierStatus {
   OFFLINE
-  ONLINE
+  AVAILABLE
   BUSY
+  SUSPENDED
+}
+
+enum CourierVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MerchantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
 }
 
 enum StoreCategory {
@@ -33,15 +47,24 @@ enum StoreCategory {
 }
 
 enum OrderStatus {
-  PENDING
-  ACCEPTED
+  PENDING_MERCHANT
+  MERCHANT_ACCEPTED
   PREPARING
   READY_FOR_PICKUP
+  SEARCHING_COURIER
   COURIER_ASSIGNED
+  COURIER_ACCEPTED
+  COURIER_TO_MERCHANT
+  AT_MERCHANT
   PICKED_UP
   ON_THE_WAY
+  ARRIVED
   DELIVERED
-  CANCELLED
+  COMPLETED
+  MERCHANT_REJECTED
+  CUSTOMER_CANCELLED
+  COURIER_CANCELLED
+  FAILED
 }
 
 enum PaymentMethod {
@@ -54,6 +77,10 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+  BANKAK_PENDING
+  BANKAK_SUBMITTED
+  BANKAK_VERIFIED
+  BANKAK_REJECTED
 }
 
 model User {
@@ -90,26 +117,30 @@ model CustomerProfile {
 }
 
 model MerchantProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String         @id @default(uuid())
+  userId              String         @unique
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   businessName        String
   businessDescription String?
   businessArea        String?
+  status              MerchantStatus @default(PENDING)
+  verificationDocs    String?
   stores              Store[]
 }
 
 model CourierProfile {
-  id                   String        @id @default(uuid())
-  userId               String        @unique
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String                    @id @default(uuid())
+  userId               String                    @unique
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicleType          VehicleType
   idNumber             String
   licenseNumber        String?
-  status               CourierStatus @default(OFFLINE)
-  isOnline             Boolean       @default(false)
+  verificationStatus   CourierVerificationStatus @default(PENDING)
+  status               CourierStatus             @default(OFFLINE)
+  isOnline             Boolean                   @default(false)
   currentLatitude      Float?
   currentLongitude     Float?
+  lastLocationUpdate   DateTime?
 }
 
 model AdminProfile {
@@ -119,55 +150,68 @@ model AdminProfile {
 }
 
 model Store {
-  id          String           @id @default(uuid())
-  merchantId  String
-  merchant    MerchantProfile  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  logoUrl     String?
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  category    StoreCategory
-  isOpen      Boolean          @default(true)
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id                String          @id @default(uuid())
+  merchantId        String
+  merchant          MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  logoUrl           String?
+  coverUrl          String?
+  address           String?
+  latitude          Float?
+  longitude         Float?
+  category          StoreCategory
+  isOpen            Boolean         @default(true)
+  isActive          Boolean         @default(true)
+  deliveryFee       Float           @default(500.0)
+  minOrderAmount    Float           @default(0.0)
+  estimatedPrepTime Int             @default(20) // in minutes
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  products    Product[]
-  orders      Order[]
+  products          Product[]
+  categories        ProductCategory[]
+  orders            Order[]
 }
 
 model ProductCategory {
   id        String    @id @default(uuid())
-  name      String    @unique
+  storeId   String?
+  store     Store?    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nameAr    String
+  nameEn    String?
   products  Product[]
 }
 
 model Product {
-  id          String           @id @default(uuid())
-  storeId     String
-  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  categoryId  String?
-  category    ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  name        String
-  description String?
-  price       Float
-  imageUrl    String?
-  isAvailable Boolean          @default(true)
-  stock       Int              @default(0)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id               String           @id @default(uuid())
+  storeId          String
+  store            Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryId       String?
+  category         ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  nameAr           String
+  nameEn           String?
+  descriptionAr    String?
+  descriptionEn    String?
+  price            Float
+  discountPrice    Float?
+  imageUrl         String?
+  isAvailable      Boolean          @default(true)
+  stock            Int              @default(100)
+  unit             String?          @default("piece")
+  preparationNotes String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  orderItems  OrderItem[]
+  orderItems       OrderItem[]
 }
 
 model Address {
   id         String   @id @default(uuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title      String
-  city       String
+  title      String   // e.g., 'البيت', 'الشغل'
+  city       String   @default("الخرطوم")
   area       String
   street     String
   landmark   String?
@@ -178,47 +222,61 @@ model Address {
 }
 
 model Order {
-  id              String               @id @default(uuid())
-  customerId      String
-  customer        User                 @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
-  storeId         String
-  store           Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  courierId       String?
-  courier         User?                @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
-  status          OrderStatus          @default(PENDING)
-  subtotal        Float
-  deliveryFee     Float
-  total           Float
-  paymentMethod   PaymentMethod
-  deliveryAddress String
-  latitude        Float
-  longitude       Float
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  id                String               @id @default(uuid())
+  orderNumber       String               @unique // e.g., TLB-10001
+  customerId        String
+  customer          User                 @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  storeId           String
+  store             Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  courierId         String?
+  courier           User?                @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
+  status            OrderStatus          @default(PENDING_MERCHANT)
+  subtotal          Float
+  deliveryFee       Float
+  discount          Float                @default(0.0)
+  total             Float
+  paymentMethod     PaymentMethod        @default(CASH)
+  paymentStatus     PaymentStatus        @default(UNPAID)
+  deliveryAddress   String
+  deliveryLatitude  Float
+  deliveryLongitude Float
+  customerNotes     String?
+  merchantNotes     String?
+  courierNotes      String?
+  bankakProofImage  String?
+  bankakTxnRef      String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  items           OrderItem[]
-  statusHistory   OrderStatusHistory[]
-  payments        Payment[]
+  items             OrderItem[]
+  statusHistory     OrderStatusHistory[]
+  payments          Payment[]
+  locationLogs      CourierLocationLog[]
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  quantity  Int
-  price     Float
+  id          String  @id @default(uuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName String
+  unitPrice   Float
+  quantity    Int
+  subtotal    Float
 }
 
 model OrderStatusHistory {
-  id        String      @id @default(uuid())
-  orderId   String
-  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status    OrderStatus
-  timestamp DateTime    @default(now())
-  changedBy String
-  note      String?
+  id         String      @id @default(uuid())
+  orderId    String
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorType  UserRole
+  actorId    String
+  timestamp  DateTime    @default(now())
+  note       String?
+  metadata   String?
 }
 
 model Payment {
@@ -229,7 +287,20 @@ model Payment {
   paymentStatus  PaymentStatus @default(UNPAID)
   amount         Float
   transactionId  String?
+  receiptUrl     String?
   createdAt      DateTime      @default(now())
+}
+
+model CourierLocationLog {
+  id        String   @id @default(uuid())
+  courierId String
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  latitude  Float
+  longitude Float
+  heading   Float?   @default(0.0)
+  speed     Float?   @default(0.0)
+  createdAt DateTime @default(now())
 }
 
 model DeviceToken {
@@ -250,3 +321,4 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+

@@ -10,6 +10,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/enums.dart';
 import '../../../core/services/delivery_fee_service.dart';
+import '../../../data/services/order_api_service.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/mock/mock_data.dart';
 
@@ -23,19 +24,18 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentMethod _selectedPayment = PaymentMethod.cashOnDelivery;
   final _notesController = TextEditingController();
+  final _bankakRefController = TextEditingController();
+  final OrderApiService _orderApiService = OrderApiService();
   bool _isLoading = false;
 
-  // Default selected address, can be updated via AddressScreen
   AddressModel _selectedAddress = MockData.addressBahri;
   double? _userLat;
   double? _userLng;
 
-  // Premium HSL-derived colors
   final Color hslPrimary = HSLColor.fromAHSL(1.0, 25.0, 1.0, 0.50).toColor();
   final Color hslGradientStart = HSLColor.fromAHSL(1.0, 25.0, 1.0, 0.55).toColor();
   final Color hslGradientEnd = HSLColor.fromAHSL(1.0, 12.0, 1.0, 0.50).toColor();
   final Color hslCream = HSLColor.fromAHSL(1.0, 25.0, 0.85, 0.97).toColor();
-  final Color hslSoftGray = HSLColor.fromAHSL(1.0, 240.0, 0.05, 0.94).toColor();
 
   @override
   void initState() {
@@ -58,7 +58,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         setState(() {
           _userLat = pos.latitude;
           _userLng = pos.longitude;
-          // Pre-fill selected address coordinates if it's the default mock address
           _selectedAddress = AddressModel(
             id: _selectedAddress.id,
             title: _selectedAddress.title,
@@ -75,10 +74,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (_) {}
   }
 
-  void _confirmOrder(double deliveryFee, double serviceFee, double total, double storeLat, double storeLng) {
+  Future<void> _confirmOrder(double deliveryFee, double serviceFee, double total, double storeLat, double storeLng) async {
     final cart = context.read<CartProvider>();
     final dataProvider = context.read<DataProvider>();
-    final auth = context.read<AuthProvider>();
 
     if (cart.items.isEmpty) return;
 
@@ -86,30 +84,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final storeId = cart.items.first.product.storeId;
-      
-      final newOrder = dataProvider.placeOrder(
-        customerId: auth.currentUser?.id ?? '',
+      final itemsData = cart.items.map((item) => {
+        'productId': item.product.id,
+        'quantity': item.quantity,
+      }).toList();
+
+      final deliveryAddressStr = '${_selectedAddress.area} - ${_selectedAddress.street}';
+      final custLat = _selectedAddress.latitude != 0 ? _selectedAddress.latitude : (_userLat ?? 15.5006);
+      final custLng = _selectedAddress.longitude != 0 ? _selectedAddress.longitude : (_userLng ?? 32.5599);
+
+      final res = await _orderApiService.createOrder(
         storeId: storeId,
-        cartItems: cart.items,
-        address: _selectedAddress,
-        customerLat: _selectedAddress.latitude != 0 ? _selectedAddress.latitude : (_userLat ?? 15.5006),
-        customerLng: _selectedAddress.longitude != 0 ? _selectedAddress.longitude : (_userLng ?? 32.5599),
-        storeLat: storeLat,
-        storeLng: storeLng,
-        subtotal: cart.totalPrice,
-        deliveryFee: deliveryFee,
-        serviceFee: serviceFee,
-        discount: 0.0,
-        total: total,
-        paymentMethod: _selectedPayment,
-        paymentStatus: PaymentStatus.unpaid,
+        items: itemsData,
+        deliveryAddress: deliveryAddressStr,
+        deliveryLatitude: custLat,
+        deliveryLongitude: custLng,
+        paymentMethod: _selectedPayment == PaymentMethod.bankak ? 'BANKAK' : 'CASH',
+        customerNotes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        bankakTxnRef: _selectedPayment == PaymentMethod.bankak ? _bankakRefController.text.trim() : null,
       );
 
-      final orderId = newOrder.id;
+      final orderId = res['id'];
       cart.clearCart();
+      await dataProvider.fetchRealOrders();
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إرسال الطلب بنجاح!')),
+        );
         context.go('/customer/order-tracking/$orderId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في تقديم الطلب: ${e.toString()}'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -119,6 +128,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    _bankakRefController.dispose();
     super.dispose();
   }
 
@@ -147,21 +157,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final storeId = cart.items.first.product.storeId;
     final store = dataProvider.stores.firstWhere(
       (s) => s.id == storeId,
-      orElse: () => dataProvider.stores.first,
+      orElse: () => dataProvider.stores.isNotEmpty ? dataProvider.stores.first : MockData.mockStores.first,
     );
 
-    // Calculate dynamic delivery fee based on customer address
     double custLat = _selectedAddress.latitude != 0 ? _selectedAddress.latitude : (_userLat ?? 15.5006);
     double custLng = _selectedAddress.longitude != 0 ? _selectedAddress.longitude : (_userLng ?? 32.5599);
 
     final distance = DeliveryFeeService.distanceKm(custLat, custLng, store.latitude, store.longitude);
-    final deliveryFee = DeliveryFeeService.deliveryFee(distance);
+    final deliveryFee = store.deliveryFee > 0 ? store.deliveryFee : DeliveryFeeService.deliveryFee(distance);
     final serviceFee = DeliveryFeeService.serviceFee(cart.totalPrice);
-    final total = DeliveryFeeService.orderTotal(
-      subtotal: cart.totalPrice,
-      deliveryFee: deliveryFee,
-      serviceFee: serviceFee,
-    );
+    final total = cart.totalPrice + deliveryFee;
 
     return Scaffold(
       backgroundColor: hslCream,
@@ -195,17 +200,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   if (!mounted) return;
                   if (result != null && result is String) {
                     setState(() {
-                      // Note: We use geolocator coordinates if selecting a new location
                       _selectedAddress = AddressModel(
                         id: 'new',
                         title: 'موقع مخصص',
-                        city: '',
-                        area: '',
+                        city: 'الخرطوم',
+                        area: 'الرياض',
                         street: result,
                         landmark: '',
                         latitude: _userLat ?? 15.5006,
                         longitude: _userLng ?? 32.5599,
-                        phone: '',
+                        phone: '0912345678',
                       );
                     });
                   }
@@ -276,11 +280,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
               _buildPaymentCard(
                 title: 'بنكك (Bankak)',
-                subtitle: 'تحويل بنكي مباشر',
+                subtitle: 'تحويل بنكي مباشر (تأكيد يدوي عبر رقم الإشعار)',
                 icon: Icons.account_balance_outlined,
                 method: PaymentMethod.bankak,
                 color: Colors.blue,
               ),
+
+              if (_selectedPayment == PaymentMethod.bankak) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _bankakRefController,
+                  decoration: InputDecoration(
+                    hintText: 'أدخل رقم العملية أو إشعار بنكك (اختياري)',
+                    hintStyle: GoogleFonts.cairo(color: Colors.grey.shade400, fontSize: 13),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 28),
 
@@ -332,11 +354,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     _buildSummaryRow('المجموع الفرعي', '${cart.totalPrice.toInt()} ج.س'),
                     const SizedBox(height: 10),
-                    _buildSummaryRow('مسافة التوصيل', '${distance.toStringAsFixed(1)} كم'),
+                    _buildSummaryRow('مسافة التوصيل التقريبية', '${distance.toStringAsFixed(1)} كم'),
                     const SizedBox(height: 10),
-                    _buildSummaryRow('رسوم التوصيل (3,000 ج.س/كم)', '${deliveryFee.toInt()} ج.س'),
-                    const SizedBox(height: 10),
-                    _buildSummaryRow('رسوم الخدمة (6%)', '${serviceFee.toInt()} ج.س'),
+                    _buildSummaryRow('رسوم التوصيل', '${deliveryFee.toInt()} ج.س'),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 14),
                       child: Divider(color: AppColors.borderGray, height: 1),
@@ -344,7 +364,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('الإجمالي', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w900)),
+                        Text('الإجمالي النهائي', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w900)),
                         Text(
                           '${total.toInt()} ج.س',
                           style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w900, color: hslPrimary),

@@ -1,37 +1,44 @@
 import 'dart:developer';
+import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import '../network/api_endpoints.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
   factory SocketService() => _instance;
-  
+
   SocketService._internal();
 
   io.Socket? _socket;
 
-  // You can change this to your live server URL later (e.g. https://api.talabaty.com)
-  final String _serverUrl = 'http://10.0.2.2:3000'; // 10.0.2.2 is localhost for Android Emulator
+  String get _socketUrl {
+    final base = ApiEndpoints.baseUrl;
+    if (base.endsWith('/api')) {
+      return base.substring(0, base.length - 4);
+    }
+    return base;
+  }
 
   void connect() {
     if (_socket != null && _socket!.connected) return;
 
-    _socket = io.io(_serverUrl, <String, dynamic>{
-      'transports': ['websocket'],
+    _socket = io.io(_socketUrl, <String, dynamic>{
+      'transports': ['websocket', 'polling'],
       'autoConnect': false,
     });
 
     _socket!.connect();
 
     _socket!.onConnect((_) {
-      log('✅ Connected to WebSocket Server');
+      debugPrint('✅ Connected to Socket.IO Server at $_socketUrl');
     });
 
     _socket!.onDisconnect((_) {
-      log('❌ Disconnected from WebSocket Server');
+      debugPrint('❌ Disconnected from Socket.IO Server');
     });
 
     _socket!.onError((error) {
-      log('⚠️ WebSocket Error: $error');
+      debugPrint('⚠️ Socket Error: $error');
     });
   }
 
@@ -40,36 +47,77 @@ class SocketService {
     _socket = null;
   }
 
-  // Courier joins their own tracking room or specific order room
   void joinOrderRoom(String orderId) {
     if (_socket == null || !_socket!.connected) connect();
     _socket?.emit('joinOrderRoom', orderId);
-    log('Joined tracking room for order: $orderId');
+    debugPrint('Joined tracking room for order: $orderId');
   }
 
-  // Courier emits their new location
-  void emitLocation(String orderId, double lat, double lng) {
+  void joinUserRoom(String userId) {
+    if (_socket == null || !_socket!.connected) connect();
+    _socket?.emit('joinUserRoom', userId);
+    debugPrint('Joined user room: user_$userId');
+  }
+
+  void joinStoreRoom(String storeId) {
+    if (_socket == null || !_socket!.connected) connect();
+    _socket?.emit('joinStoreRoom', storeId);
+    debugPrint('Joined store room: store_$storeId');
+  }
+
+  void joinCourierChannel() {
+    if (_socket == null || !_socket!.connected) connect();
+    _socket?.emit('joinCourierChannel');
+    debugPrint('Joined available couriers channel');
+  }
+
+  void emitLocation(String orderId, double lat, double lng, {double heading = 0.0}) {
     if (_socket != null && _socket!.connected) {
       _socket!.emit('updateLocation', {
         'orderId': orderId,
         'lat': lat,
         'lng': lng,
+        'heading': heading,
       });
-      log('📍 Location emitted: $lat, $lng');
     }
   }
 
-  // Customer listens for location updates
-  void onLocationUpdate(Function(double lat, double lng) callback) {
-    _socket?.on('locationUpdated', (data) {
-      if (data is Map && data['lat'] != null && data['lng'] != null) {
-        callback((data['lat'] as num).toDouble(), (data['lng'] as num).toDouble());
+  void onLocationUpdate(Function(Map<String, dynamic> data) callback) {
+    _socket?.on('courier.location_updated', (data) {
+      if (data is Map) {
+        callback(Map<String, dynamic>.from(data));
       }
     });
   }
-  
-  // Cleanup listener
-  void offLocationUpdate() {
-    _socket?.off('locationUpdated');
+
+  void onOrderStatusUpdate(Function(Map<String, dynamic> data) callback) {
+    _socket?.on('order.status_updated', (data) {
+      if (data is Map) {
+        callback(Map<String, dynamic>.from(data));
+      }
+    });
+  }
+
+  void onOrderCreated(Function(Map<String, dynamic> data) callback) {
+    _socket?.on('order.created', (data) {
+      if (data is Map) {
+        callback(Map<String, dynamic>.from(data));
+      }
+    });
+  }
+
+  void onCourierOfferReceived(Function(Map<String, dynamic> data) callback) {
+    _socket?.on('courier.offer_received', (data) {
+      if (data is Map) {
+        callback(Map<String, dynamic>.from(data));
+      }
+    });
+  }
+
+  void offAllListeners() {
+    _socket?.off('courier.location_updated');
+    _socket?.off('order.status_updated');
+    _socket?.off('order.created');
+    _socket?.off('courier.offer_received');
   }
 }

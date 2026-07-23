@@ -33,7 +33,7 @@ export default function CoverageMapSection() {
           <div className="bg-white rounded-3xl p-4 sm:p-8 border border-orange-100/90 shadow-xl shadow-orange-950/5 transition-all duration-300 overflow-hidden">
             <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden bg-[#FAF7F2]">
               <Image
-                src="/experience/coverage/sudan-map.webp"
+                src="/experience/coverage/sudan-map-official.webp"
                 alt="Talabaty Sudan Coverage Map Visual"
                 fill
                 sizes="(max-width: 1200px) 100vw, 1100px"
