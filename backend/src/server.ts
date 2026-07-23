@@ -9,6 +9,8 @@ import {
   registerCourier,
   login,
   changePassword,
+  verifySetupToken,
+  completeFirstTimeSetup,
   refresh,
   logout,
   getMe,
@@ -127,6 +129,8 @@ app.post('/api/auth/register/merchant', registerMerchant);
 app.post('/api/auth/register/courier', registerCourier);
 app.post('/api/auth/login', loginRateLimiter, login);
 app.post('/api/auth/change-password', authenticate, changePassword);
+app.get('/api/admin/setup-verify', verifySetupToken);
+app.post('/api/admin/setup-password', completeFirstTimeSetup);
 app.post('/api/auth/refresh', refresh);
 app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', authenticate, getMe);

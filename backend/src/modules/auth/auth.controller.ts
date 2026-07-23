@@ -503,6 +503,7 @@ export const getMe = async (req: Request, res: Response) => {
         isVerified: true,
         isActive: true,
         forcePasswordChange: true,
+        firstTimeSetupCompleted: true,
         createdAt: true,
       },
     });
@@ -514,5 +515,139 @@ export const getMe = async (req: Request, res: Response) => {
     return res.json(user);
   } catch (error: any) {
     return res.status(500).json({ error: 'Failed to retrieve profile' });
+  }
+};
+
+export const verifySetupToken = async (req: Request, res: Response) => {
+  try {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(400).json({ valid: false, error: 'رابط التفعيل غير صالح أو ناقص' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await prisma.user.findFirst({
+      where: {
+        activationTokenHash: tokenHash,
+        firstTimeSetupCompleted: false,
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ valid: false, error: 'رابط التفعيل غير صالح أو تم استخدامه سابقاً' });
+    }
+
+    if (!user.activationTokenExpiresAt || user.activationTokenExpiresAt < new Date()) {
+      return res.status(400).json({ valid: false, error: 'انتهت صلاحية رابط التفعيل. يرجى توليد رابط جديد' });
+    }
+
+    return res.json({
+      valid: true,
+      email: user.email || 'superadmin@talabaty.com',
+      name: user.name,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ valid: false, error: 'فشل التحقق من رابط التفعيل' });
+  }
+};
+
+export const completeFirstTimeSetup = async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'جميع البيانات مطلوبة' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await prisma.user.findFirst({
+      where: {
+        activationTokenHash: tokenHash,
+        firstTimeSetupCompleted: false,
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'رابط التفعيل غير صالح أو تم استخدامه من قبل' });
+    }
+
+    if (!user.activationTokenExpiresAt || user.activationTokenExpiresAt < new Date()) {
+      return res.status(400).json({ error: 'انتهت صلاحية رابط التفعيل، يرجى طلب رابط جديد' });
+    }
+
+    // Password requirements: Min 12 chars, upper, lower, digit, special char
+    if (newPassword.length < 12) {
+      return res.status(400).json({ error: 'يجب ألا تقل كلمة المرور عن 12 حرفاً' });
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ error: 'يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل (A-Z)' });
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      return res.status(400).json({ error: 'يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل (a-z)' });
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ error: 'يجب أن تحتوي كلمة المرور على رقم واحد على الأقل (0-9)' });
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) {
+      return res.status(400).json({ error: 'يجب أن تحتوي كلمة المرور على رمز خاص واحد على الأقل' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const newVersion = user.tokenVersion + 1;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        firstTimeSetupCompleted: true,
+        activationTokenHash: null,
+        activationTokenExpiresAt: null,
+        tokenVersion: newVersion,
+        forcePasswordChange: false,
+        failedLoginAttempts: 0,
+        lockoutUntil: null,
+        passwordChangedAt: new Date(),
+      },
+    });
+
+    // Revoke all existing refresh tokens
+    await prisma.refreshToken.updateMany({
+      where: { userId: user.id },
+      data: { revoked: true },
+    });
+
+    const accessToken = generateAccessToken({
+      id: updatedUser.id,
+      role: updatedUser.role,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      tokenVersion: newVersion,
+    });
+
+    const refreshToken = generateRefreshToken(updatedUser.id, newVersion);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: updatedUser.id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt,
+      },
+    });
+
+    return res.json({
+      message: 'تم إنشاء كلمة المرور وإكمال إعداد الحساب بنجاح! 🚀',
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        firstTimeSetupCompleted: true,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'فشل تفعيل كلمة المرور' });
   }
 };
