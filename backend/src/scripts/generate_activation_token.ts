@@ -24,9 +24,9 @@ async function main() {
   // Generate 64-char random hex token
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-  const expiresAt = new Date(Date.now() + 25 * 60 * 1000); // 25 minutes validity
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes validity
 
-  // Revoke all existing sessions and set setup pending
+  // Revoke all existing sessions, clear lockout/attempts, and set setup pending
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -37,6 +37,8 @@ async function main() {
       activationTokenHash: tokenHash,
       activationTokenExpiresAt: expiresAt,
       tokenVersion: user.tokenVersion + 1,
+      failedLoginAttempts: 0,
+      lockoutUntil: null,
     },
   });
 
