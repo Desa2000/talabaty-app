@@ -29,10 +29,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const isLoginPage = pathname === '/admin/login';
+  const isUnprotectedPage = pathname === '/admin/login' || pathname === '/admin/setup';
 
   useEffect(() => {
-    if (isLoginPage) {
+    if (isUnprotectedPage) {
       setLoading(false);
       return;
     }
@@ -54,9 +54,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     setAdminUser(user);
     setLoading(false);
-  }, [pathname, isLoginPage, router]);
+  }, [pathname, isUnprotectedPage, router]);
 
-  if (isLoginPage) {
+  if (isUnprotectedPage) {
     return <>{children}</>;
   }
 

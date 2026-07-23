@@ -111,7 +111,7 @@ function AdminSetupContent() {
             <AlertCircle className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">رابط التفعيل غير صالح</h1>
+            <h1 className="text-xl font-bold text-white">رابط الإعداد غير صالح أو انتهت صلاحيته</h1>
             <p className="text-sm text-gray-400 mt-2">{errorMessage}</p>
           </div>
           <Link
