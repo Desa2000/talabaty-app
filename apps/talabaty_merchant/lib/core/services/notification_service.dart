@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../network/api_client.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -17,9 +18,11 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  String? _lastRegisteredToken;
+  String? _currentAppType;
+
   Future<void> initialize() async {
     try {
-      // Request permissions for iOS and Android 13+
       NotificationSettings settings = await _fcm.requestPermission(
         alert: true,
         announcement: false,
@@ -32,7 +35,6 @@ class NotificationService {
 
       debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-      // Setup local notifications
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const DarwinInitializationSettings initializationSettingsIOS =
@@ -50,25 +52,60 @@ class NotificationService {
         },
       );
 
-      // Setup background handler
-      FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
-      );
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      // Listen to foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('Got a message whilst in the foreground!');
-        debugPrint('Message data: ${message.data}');
-
+        debugPrint('Got a message whilst in the foreground: ${message.data}');
         if (message.notification != null) {
-          debugPrint(
-            'Message also contained a notification: ${message.notification}',
-          );
           _showLocalNotification(message);
+        }
+      });
+
+      _fcm.onTokenRefresh.listen((newToken) {
+        if (_currentAppType != null) {
+          registerFCMToken(_currentAppType!, overrideToken: newToken);
         }
       });
     } catch (e) {
       debugPrint('Error initializing NotificationService: $e');
+    }
+  }
+
+  /// Register FCM token to Backend PostgreSQL database via REST API
+  Future<void> registerFCMToken(String appType, {String? overrideToken}) async {
+    _currentAppType = appType;
+    try {
+      final token = overrideToken ?? await _fcm.getToken();
+      if (token == null || token.isEmpty) return;
+
+      _lastRegisteredToken = token;
+      await ApiClient().dio.post(
+        '/devices/token',
+        data: {
+          'token': token,
+          'platform': 'ANDROID',
+          'appType': appType,
+        },
+      );
+      debugPrint('FCM token registered to backend [$appType]');
+    } catch (e) {
+      debugPrint('Error registering FCM token to backend: $e');
+    }
+  }
+
+  /// Unregister FCM token on logout
+  Future<void> unregisterFCMToken() async {
+    try {
+      final token = _lastRegisteredToken ?? await _fcm.getToken();
+      if (token != null && token.isNotEmpty) {
+        await ApiClient().dio.delete(
+          '/devices/token',
+          data: {'token': token},
+        );
+        debugPrint('FCM token unregistered from backend');
+      }
+    } catch (e) {
+      debugPrint('Error unregistering FCM token from backend: $e');
     }
   }
 
@@ -97,11 +134,15 @@ class NotificationService {
         payload: jsonEncode(message.data),
       );
     } catch (e) {
-      debugPrint('Error showing local notification in background: $e');
+      debugPrint('Error showing local notification: $e');
     }
   }
 
   Future<String?> getToken() async {
-    return await _fcm.getToken();
+    try {
+      return await _fcm.getToken();
+    } catch (e) {
+      return null;
+    }
   }
 }

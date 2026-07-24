@@ -1,3 +1,4 @@
+import '../services/notification_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/auth_api_service.dart';
@@ -85,6 +86,7 @@ class AuthProvider extends ChangeNotifier {
         if (_isDisposed) return;
         if (user != null) {
           _currentUser = user;
+          NotificationService().registerFCMToken("CUSTOMER");
         } else {
           await ApiClient().clearTokens();
           _currentUser = null;
@@ -306,6 +308,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      try { await NotificationService().unregisterFCMToken(); } catch (_) {}
       await _authApiService.logout();
     } catch (e) {
       debugPrint('Error during backend logout: $e');

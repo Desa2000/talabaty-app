@@ -4,6 +4,7 @@ import { prisma } from '../../utils/prisma';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { io } from '../../server';
 import { RoutingService } from '../../services/routing.service';
+import { NotificationService } from '../../services/notification.service';
 
 // Helper to generate readable order number
 function generateOrderNumber(): string {
@@ -128,12 +129,23 @@ export const createOrder = async (req: Request, res: Response) => {
       return newOrder;
     });
 
-    // Real-Time Socket Emission
+    // Real-Time Socket Emission & Push Notification
     try {
       io.to(`store_${store.id}`).emit('order.created', order);
       io.to(`user_${userId}`).emit('order.created', order);
+
+      // Send FCM push to store merchant
+      if (store.merchantId) {
+        NotificationService.sendToUser({
+          userId: store.merchantId,
+          title: 'طلب جديد 📦',
+          body: `لديك طلب جديد #${order.orderNumber}`,
+          data: { type: 'ORDER_CREATED', orderId: order.id },
+          appType: 'MERCHANT',
+        });
+      }
     } catch (e) {
-      console.error('Socket emission error:', e);
+      console.error('Socket emission or notification error:', e);
     }
 
     return res.status(201).json(order);

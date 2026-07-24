@@ -130,7 +130,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', system: 'Talabaty API', timestamp: new Date() });
 });
 
-// 1. Auth Routes
+import {
+  registerDeviceToken,
+  unregisterDeviceToken,
+} from './modules/devices/device.controller';
+
+// 1. Auth & Device Routes
 app.post('/api/auth/register/customer', registerCustomer);
 app.post('/api/auth/register/merchant', registerMerchant);
 app.post('/api/auth/register/courier', registerCourier);
@@ -142,6 +147,8 @@ app.post('/api/admin/setup-password', completeFirstTimeSetup);
 app.post('/api/auth/refresh', refresh);
 app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', authenticate, getMe);
+app.post('/api/devices/token', authenticate, registerDeviceToken);
+app.delete('/api/devices/token', authenticate, unregisterDeviceToken);
 
 // 2. Store Routes
 app.get('/api/stores', getStores);
