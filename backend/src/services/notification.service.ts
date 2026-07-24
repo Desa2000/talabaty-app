@@ -8,18 +8,25 @@ let firebaseAdmin: any = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const admin = require('firebase-admin');
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+
+  if (admin.apps.length > 0) {
+    firebaseAdmin = admin.app();
+    console.log('[NotificationService] Using existing Firebase Admin SDK instance');
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // Preferred production method: Application Default Credentials
+    firebaseAdmin = admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+    });
+    console.log('[NotificationService] Firebase Admin SDK initialized using Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS)');
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    // Backwards compatibility fallback
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    if (!admin.apps.length) {
-      firebaseAdmin = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else {
-      firebaseAdmin = admin.app();
-    }
-    console.log('[NotificationService] Firebase Admin SDK initialized successfully');
+    firebaseAdmin = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log('[NotificationService] Firebase Admin SDK initialized using FIREBASE_SERVICE_ACCOUNT_JSON');
   } else {
-    console.log('[NotificationService] FIREBASE_SERVICE_ACCOUNT_JSON not provided. Push notifications logged to console.');
+    console.log('[NotificationService] Push credentials not provided (neither GOOGLE_APPLICATION_CREDENTIALS nor FIREBASE_SERVICE_ACCOUNT_JSON). Push notifications logged to console.');
   }
 } catch (e) {
   console.log('[NotificationService] firebase-admin package or credentials not available. Push notifications logged to console.');
