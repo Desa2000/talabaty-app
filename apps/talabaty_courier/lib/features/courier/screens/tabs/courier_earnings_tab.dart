@@ -7,6 +7,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/data_provider.dart';
 import '../../../../data/models/user_model.dart';
+import '../../../../data/models/order_model.dart';
 
 class CourierEarningsTab extends StatefulWidget {
   const CourierEarningsTab({super.key});
@@ -49,12 +50,13 @@ class _CourierEarningsTabState extends State<CourierEarningsTab> {
             ),
     );
 
-    final completedOrders =
-        dataProvider
-            .getOrdersForCourier(courier.userId)
+    final List<OrderModel> completedOrders = courierId.isNotEmpty
+        ? dataProvider
+            .getOrdersForCourier(courierId)
             .where((o) => o.status == OrderStatus.delivered)
             .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        : <OrderModel>[];
+    completedOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     final now = DateTime.now();
     final todayEarnings = completedOrders

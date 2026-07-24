@@ -1,5 +1,6 @@
-package com.talabaty.talabaty_app
+﻿package com.talabaty.courier
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

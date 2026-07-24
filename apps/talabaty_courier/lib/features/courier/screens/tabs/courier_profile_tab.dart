@@ -29,20 +29,19 @@ class CourierProfileTab extends StatelessWidget {
               vehicleType: VehicleType.motorcycle,
             ),
     );
-    final courierUser = dataProvider.users.firstWhere(
-      (u) => u.id == courier.userId,
-      orElse: () => dataProvider.users.isNotEmpty
-          ? dataProvider.users.first
-          : UserModel(
-              id: 'dummy',
-              name: 'سائق تجريبي',
-              email: '',
-              phone: '123',
-              password: '',
-              role: UserRole.courier,
-              createdAt: DateTime.now(),
-            ),
-    );
+    final courierUser = auth.currentUser ??
+        dataProvider.users.firstWhere(
+          (u) => u.id == courierId,
+          orElse: () => UserModel(
+            id: 'dummy',
+            name: 'سائق',
+            email: '',
+            phone: '',
+            password: '',
+            role: UserRole.courier,
+            createdAt: DateTime.now(),
+          ),
+        );
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,

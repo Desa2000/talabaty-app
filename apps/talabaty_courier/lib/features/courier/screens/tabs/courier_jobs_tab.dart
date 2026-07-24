@@ -33,6 +33,11 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
   void initState() {
     super.initState();
     _determinePosition();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<DataProvider>().fetchRealOrders();
+      }
+    });
   }
 
   @override
@@ -45,36 +50,36 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
     bool serviceEnabled;
     LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showLocationWarning(
-        'خدمات الموقع (GPS) مغلقة، يرجى تفعيلها من إعدادات الهاتف.',
-      );
-      if (mounted) setState(() => _isLoadingLocation = false);
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
         _showLocationWarning(
-          'التطبيق يحتاج لصلاحية الموقع لتحديد موقعك وتلقي الطلبات.',
+          'خدمات الموقع (GPS) مغلقة، يرجى تفعيلها من إعدادات الهاتف.',
         );
         if (mounted) setState(() => _isLoadingLocation = false);
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      _showLocationWarning(
-        'صلاحية الموقع مرفوضة دائماً. يرجى تفعيلها من إعدادات التطبيق.',
-      );
-      if (mounted) setState(() => _isLoadingLocation = false);
-      return;
-    }
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showLocationWarning(
+            'التطبيق يحتاج لصلاحية الموقع لتحديد موقعك وتلقي الطلبات.',
+          );
+          if (mounted) setState(() => _isLoadingLocation = false);
+          return;
+        }
+      }
 
-    try {
+      if (permission == LocationPermission.deniedForever) {
+        _showLocationWarning(
+          'صلاحية الموقع مرفوضة دائماً. يرجى تفعيلها من إعدادات التطبيق.',
+        );
+        if (mounted) setState(() => _isLoadingLocation = false);
+        return;
+      }
+
       final position = await Geolocator.getCurrentPosition();
       if (mounted) {
         final newLoc = LatLng(position.latitude, position.longitude);
@@ -125,35 +130,14 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
     final auth = context.watch<AuthProvider>();
     final dataProvider = context.watch<DataProvider>();
 
-    final courierId = auth.currentUser?.id ?? '';
-    final courier = dataProvider.couriers.firstWhere(
-      (c) => c.userId == courierId,
-      orElse: () => dataProvider.couriers.isNotEmpty
-          ? dataProvider.couriers.first
-          : CourierProfile(
-              userId: courierId,
-              nationalId: '123',
-              dateOfBirth: '1995-01-01',
-              emergencyPhone: '123',
-              vehicleType: VehicleType.motorcycle,
-            ),
-    );
-    final courierUser = dataProvider.users.firstWhere(
-      (u) => u.id == courier.userId,
-      orElse: () => dataProvider.users.isNotEmpty
-          ? dataProvider.users.first
-          : UserModel(
-              id: 'dummy',
-              name: 'سائق تجريبي',
-              email: '',
-              phone: '123',
-              password: '',
-              role: UserRole.courier,
-              createdAt: DateTime.now(),
-            ),
-    );
+    final currentUser = auth.currentUser;
+    final courierId = currentUser?.id ?? '';
+    final courierName = currentUser?.name ?? 'المندوب';
 
-    final myOrders = dataProvider.getOrdersForCourier(courier.userId);
+    final myOrders = courierId.isNotEmpty
+        ? dataProvider.getOrdersForCourier(courierId)
+        : <OrderModel>[];
+
     final activeOrder = myOrders
         .where(
           (o) =>
@@ -161,6 +145,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
               o.status != OrderStatus.cancelled,
         )
         .firstOrNull;
+
     final availableOrders = dataProvider
         .getAvailableOrdersForCourier()
         .where((o) => !_rejectedOrders.contains(o.id))
@@ -180,9 +165,8 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
 
     final isOnline = _isOnline;
 
-    // Build Google Map Markers
+    // Build Map Markers
     final Set<Marker> markers = {
-      // Courier Location Marker
       Marker(
         markerId: const MarkerId('courier_self'),
         position: _currentLocation,
@@ -191,14 +175,13 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       ),
     };
 
-    // Store Markers for available orders
     for (final order in availableOrders) {
       markers.add(
         Marker(
           markerId: MarkerId('store_${order.id}'),
           position: LatLng(order.storeLat, order.storeLng),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(title: 'محل ${order.storeId}'),
+          infoWindow: InfoWindow(title: 'المتجر'),
           onTap: () {
             setState(() {
               _selectedOrderId = order.id;
@@ -208,7 +191,6 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       );
     }
 
-    // Customer Destination Marker if order is selected
     if (selectedOrder != null) {
       markers.add(
         Marker(
@@ -225,7 +207,6 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       );
     }
 
-    // Polyline for selected order
     final Set<Polyline> polylines = {};
     if (selectedOrder != null) {
       polylines.add(
@@ -246,7 +227,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(
-          'كابتن ${courierUser.name}',
+          'كابتن $courierName',
           style: GoogleFonts.cairo(
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -254,253 +235,378 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 0,
+        elevation: 0.5,
         centerTitle: true,
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: activeOrder != null
-            ? _buildActiveOrderView(activeOrder)
-            : Column(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Stack(
-                      children: [
-                        GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: _currentLocation,
-                            zoom: 14.0,
-                          ),
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                          },
-                          markers: markers,
-                          polylines: polylines,
-                          zoomControlsEnabled: false,
-                          myLocationButtonEnabled: false,
-                        ),
-                        Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isOnline = !_isOnline;
-                              });
-                            },
-                            child: Container(
-                              width: 140,
-                              height: 140,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isOnline
-                                    ? Colors.green.withValues(alpha: 0.85)
-                                    : Colors.black.withValues(alpha: 0.7),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isOnline
-                                        ? Colors.green.withValues(alpha: 0.4)
-                                        : Colors.black.withValues(alpha: 0.4),
-                                    blurRadius: 30,
-                                    spreadRadius: 10,
-                                  ),
-                                ],
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  width: 3,
-                                ),
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      isOnline
-                                          ? Icons.wifi_rounded
-                                          : Icons.power_settings_new_rounded,
-                                      color: Colors.white,
-                                      size: 40,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      isOnline ? 'متصل' : 'اضغط للاتصال',
-                                      style: GoogleFonts.cairo(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+        child: _buildBodyContent(
+          dataProvider: dataProvider,
+          activeOrder: activeOrder,
+          availableOrders: availableOrders,
+          selectedOrder: selectedOrder,
+          courierId: courierId,
+          isOnline: isOnline,
+          markers: markers,
+          polylines: polylines,
+        ),
+      ),
+    );
+  }
 
-                  Expanded(
-                    flex: 3,
+  Widget _buildBodyContent({
+    required DataProvider dataProvider,
+    required OrderModel? activeOrder,
+    required List<OrderModel> availableOrders,
+    required OrderModel? selectedOrder,
+    required String courierId,
+    required bool isOnline,
+    required Set<Marker> markers,
+    required Set<Polyline> polylines,
+  }) {
+    // 1. Loading State
+    if (dataProvider.isLoadingOrders && dataProvider.orders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: AppColors.primaryColor),
+            const SizedBox(height: 16),
+            Text(
+              'جاري تحميل الطلبات...',
+              style: GoogleFonts.cairo(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2. Error State
+    if (dataProvider.ordersError != null && dataProvider.orders.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'تعذر تحميل الطلبات',
+                style: GoogleFonts.cairo(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'تأكد من الاتصال بالشبكة وحاول مرة أخرى',
+                style: GoogleFonts.cairo(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () => dataProvider.fetchRealOrders(),
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: Text(
+                  'إعادة المحاولة',
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 3. Active Order State
+    if (activeOrder != null) {
+      return _buildActiveOrderView(activeOrder);
+    }
+
+    // 4. Available Orders & Map View
+    return RefreshIndicator(
+      color: AppColors.primaryColor,
+      onRefresh: () => dataProvider.fetchRealOrders(),
+      child: Column(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _currentLocation,
+                    zoom: 14.0,
+                  ),
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                  },
+                  markers: markers,
+                  polylines: polylines,
+                  zoomControlsEnabled: false,
+                  myLocationButtonEnabled: false,
+                ),
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isOnline = !_isOnline;
+                      });
+                    },
                     child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
+                      width: 140,
+                      height: 140,
                       decoration: BoxDecoration(
-                        color: AppColors.backgroundLight,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(30),
-                        ),
+                        shape: BoxShape.circle,
+                        color: isOnline
+                            ? Colors.green.withValues(alpha: 0.85)
+                            : Colors.black.withValues(alpha: 0.7),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 20,
-                            offset: const Offset(0, -10),
+                            color: isOnline
+                                ? Colors.green.withValues(alpha: 0.4)
+                                : Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 30,
+                            spreadRadius: 10,
                           ),
                         ],
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 3,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!isOnline) ...[
-                            Expanded(
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(24),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.03,
-                                            ),
-                                            blurRadius: 20,
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.bedtime_rounded,
-                                        size: 64,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ).animate().scale(
-                                      duration: 500.ms,
-                                      curve: Curves.easeOutBack,
-                                    ),
-                                    const SizedBox(height: 24),
-                                    Text(
-                                      'أنت الآن في وضع عدم الاتصال',
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 18,
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'قم بالاتصال بالشبكة لاستقبال طلبات التوصيل',
-                                      style: GoogleFonts.cairo(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isOnline
+                                  ? Icons.wifi_rounded
+                                  : Icons.power_settings_new_rounded,
+                              color: Colors.white,
+                              size: 40,
                             ),
-                          ] else if (availableOrders.isEmpty) ...[
-                            Expanded(
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(24),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.03,
-                                            ),
-                                            blurRadius: 20,
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.radar_rounded,
-                                        size: 64,
-                                        color: AppColors.primaryColor,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 24),
-                                    Text(
-                                      'جاري البحث عن طلبات قريبة منك...',
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 18,
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ] else ...[
+                            const SizedBox(height: 8),
                             Text(
-                              'طلبات التوصيل المتاحة (${availableOrders.length})',
+                              isOnline ? 'متصل' : 'اضغط للاتصال',
                               style: GoogleFonts.cairo(
-                                fontSize: 18,
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 100),
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: availableOrders.length,
-                                itemBuilder: (context, index) {
-                                  final order = availableOrders[index];
-                                  final isSelected =
-                                      order.id == _selectedOrderId;
-                                  final distanceInMeters =
-                                      Geolocator.distanceBetween(
-                                        _currentLocation.latitude,
-                                        _currentLocation.longitude,
-                                        order.storeLat,
-                                        order.storeLng,
-                                      );
-                                  final distanceInKm = distanceInMeters / 1000;
-                                  return _buildAvailableOrderCard(
-                                        context,
-                                        order,
-                                        courier.userId,
-                                        dataProvider,
-                                        isSelected,
-                                        distanceInKm,
-                                      )
-                                      .animate()
-                                      .fade(
-                                        duration: 400.ms,
-                                        delay: Duration(
-                                          milliseconds: 100 * index,
-                                        ),
-                                      )
-                                      .slideX(begin: 0.05);
-                                },
+                                fontSize: 16,
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundLight,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, -10),
+                  ),
                 ],
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isOnline) ...[
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: 20,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.bedtime_rounded,
+                                size: 56,
+                                color: AppColors.textSecondary,
+                              ),
+                            ).animate().scale(
+                              duration: 500.ms,
+                              curve: Curves.easeOutBack,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'أنت الآن في وضع عدم الاتصال',
+                              style: GoogleFonts.cairo(
+                                fontSize: 18,
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'قم بالاتصال بالشبكة لاستقبال طلبات التوصيل',
+                              style: GoogleFonts.cairo(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else if (availableOrders.isEmpty) ...[
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: 20,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.radar_rounded,
+                                size: 56,
+                                color: AppColors.primaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'لا توجد طلبات متاحة حالياً',
+                              style: GoogleFonts.cairo(
+                                fontSize: 18,
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'خليك متصل، الطلبات الجديدة حتظهر هنا.',
+                              style: GoogleFonts.cairo(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primaryColor,
+                                side: const BorderSide(
+                                  color: AppColors.primaryColor,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () => dataProvider.fetchRealOrders(),
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: Text(
+                                'تحديث الطلبات',
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      'طلبات التوصيل المتاحة (${availableOrders.length})',
+                      style: GoogleFonts.cairo(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: availableOrders.length,
+                        itemBuilder: (context, index) {
+                          final order = availableOrders[index];
+                          final isSelected = order.id == _selectedOrderId;
+                          final distanceInMeters = Geolocator.distanceBetween(
+                            _currentLocation.latitude,
+                            _currentLocation.longitude,
+                            order.storeLat,
+                            order.storeLng,
+                          );
+                          final distanceInKm = distanceInMeters / 1000;
+                          return _buildAvailableOrderCard(
+                                context,
+                                order,
+                                courierId,
+                                dataProvider,
+                                isSelected,
+                                distanceInKm,
+                              )
+                              .animate()
+                              .fade(
+                                duration: 400.ms,
+                                delay: Duration(milliseconds: 100 * index),
+                              )
+                              .slideX(begin: 0.05);
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -542,7 +648,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
             ),
             const SizedBox(height: 8),
             Text(
-              'رقم الطلب #${order.id}',
+              'رقم الطلب #${(order.orderNumber ?? '').isNotEmpty ? order.orderNumber! : order.id}',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -551,7 +657,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
             const SizedBox(height: 40),
             Container(
               width: double.infinity,
-              height: 58,
+              height: 54,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
@@ -602,7 +708,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
           : StoreModel(
               id: 'dummy',
               ownerId: '',
-              name: 'متجر غير معروف',
+              name: 'المتجر',
               type: StoreType.restaurant,
               phone: '',
               area: '',
@@ -648,15 +754,13 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
             color: isSelected
                 ? AppColors.primaryColor
                 : AppColors.primaryColor.withValues(alpha: 0.15),
-            width: isSelected ? 2.5 : 1.5,
+            width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected
-                  ? AppColors.primaryColor.withValues(alpha: 0.15)
-                  : AppColors.primaryColor.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
@@ -664,82 +768,16 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        'طلب جديد',
-                        style: GoogleFonts.cairo(
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.directions_bike_rounded,
-                            color: AppColors.primaryColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${distanceInKm.toStringAsFixed(1)} كم',
-                            style: GoogleFonts.cairo(
-                              color: AppColors.primaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${order.deliveryFee.toStringAsFixed(0)} ج.س',
-                  style: GoogleFonts.outfit(
-                    color: Colors.green,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: AppColors.primaryColor.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.store_rounded,
                     color: AppColors.primaryColor,
-                    size: 20,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -747,118 +785,135 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'استلام من',
-                        style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
                       Text(
                         store.name,
                         style: GoogleFonts.cairo(
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          fontSize: 16,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 20),
-              child: SizedBox(
-                height: 20,
-                child: CustomPaint(painter: DashedLinePainter()),
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: Colors.green,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
                       Text(
-                        'توصيل إلى',
+                        'يبعد ${distanceInKm.toStringAsFixed(1)} كم عن موقعك',
                         style: GoogleFonts.cairo(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      Text(
-                        order.address.street,
-                        style: GoogleFonts.cairo(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
                     ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${order.deliveryFee.toStringAsFixed(0)} ج.س',
+                    style: GoogleFonts.cairo(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const Divider(height: 24),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    (order.address.area ?? '').isNotEmpty
+                        ? order.address.area!
+                        : 'عنوان التوصيل',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                  flex: 1,
                   child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: () {
                       setState(() {
                         _rejectedOrders.add(order.id);
+                        if (_selectedOrderId == order.id) {
+                          _selectedOrderId = null;
+                        }
                       });
                     },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red, width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
                     child: Text(
-                      'رفض',
+                      'تجاهل',
                       style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: () {
-                      dataProvider.courierAcceptOrder(order.id, courierId);
-                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),
+                    onPressed: () async {
+                      try {
+                        await dataProvider.courierAcceptOrder(
+                          order.id,
+                          courierId,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تم قبول الطلب بنجاح! 🚀'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('تعذر قبول الطلب: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
                     child: Text(
                       'قبول الطلب',
                       style: GoogleFonts.cairo(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        fontSize: 16,
                       ),
                     ),
                   ),
@@ -870,21 +925,4 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       ),
     );
   }
-}
-
-class DashedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    double dashHeight = 4, dashSpace = 4, startY = 0;
-    final paint = Paint()
-      ..color = Colors.grey.shade400
-      ..strokeWidth = 1.5;
-    while (startY < size.height) {
-      canvas.drawLine(Offset(0, startY), Offset(0, startY + dashHeight), paint);
-      startY += dashHeight + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

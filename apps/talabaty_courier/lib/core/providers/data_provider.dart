@@ -37,6 +37,10 @@ class DataProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool _isLoadingStores = false;
   bool get isLoadingStores => _isLoadingStores;
+  bool _isLoadingOrders = false;
+  bool get isLoadingOrders => _isLoadingOrders;
+  String? _ordersError;
+  String? get ordersError => _ordersError;
   bool _isDisposed = false;
 
   DataProvider() {
@@ -75,8 +79,9 @@ class DataProvider extends ChangeNotifier {
 
     notifyListeners();
 
-    // 2. Fetch real stores from Backend REST API
+    // 2. Fetch real stores and real orders from Backend REST API
     await fetchRealStores();
+    await fetchRealOrders();
 
     // 3. Connect Socket.IO for real-time order status and location tracking
     try {
@@ -157,6 +162,10 @@ class DataProvider extends ChangeNotifier {
   }
 
   Future<void> fetchRealOrders() async {
+    _isLoadingOrders = true;
+    _ordersError = null;
+    notifyListeners();
+
     try {
       final rawOrders = await _orderApiService.getMyOrders();
       if (_isDisposed) return;
@@ -253,9 +262,15 @@ class DataProvider extends ChangeNotifier {
       }
 
       _orders = parsed;
-      notifyListeners();
+      _ordersError = null;
     } catch (e) {
       debugPrint('Error fetching real orders: $e');
+      _ordersError = e.toString();
+    } finally {
+      if (!_isDisposed) {
+        _isLoadingOrders = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -440,9 +455,8 @@ class DataProvider extends ChangeNotifier {
   }
 
   List<OrderModel> getOrdersForCourier(String courierId) {
-    return _orders
-        .where((o) => o.courierId == courierId || o.courierId == null)
-        .toList();
+    if (courierId.isEmpty) return [];
+    return _orders.where((o) => o.courierId == courierId).toList();
   }
 
   Future<void> rateOrder({
