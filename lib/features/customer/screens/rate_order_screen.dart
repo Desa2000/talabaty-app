@@ -6,12 +6,17 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/data_provider.dart';
+import '../../../core/network/api_exception.dart';
 
 class RateOrderScreen extends StatefulWidget {
   final String orderId;
   final String storeId;
 
-  const RateOrderScreen({super.key, required this.orderId, required this.storeId});
+  const RateOrderScreen({
+    super.key,
+    required this.orderId,
+    required this.storeId,
+  });
 
   @override
   State<RateOrderScreen> createState() => _RateOrderScreenState();
@@ -32,19 +37,27 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
     setState(() => _isLoading = true);
     try {
       final dataProvider = context.read<DataProvider>();
-      await dataProvider.rateStore(widget.storeId, _rating.toDouble());
-      
+      await dataProvider.rateOrder(
+        orderId: widget.orderId,
+        rating: _rating,
+        comment: _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تقييم الطلب بنجاح، شكراً لك!')),
+          const SnackBar(
+            content: Text('تم تقييم الطلب بنجاح، شكراً لك!'),
+            backgroundColor: Colors.green,
+          ),
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
-        );
+        final errorMsg = e is ApiException ? e.message : e.toString();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) {
@@ -76,9 +89,19 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))]
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.black87),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: Colors.black87,
+            ),
           ),
           onPressed: () => context.pop(),
         ),
@@ -96,10 +119,17 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
                 color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: Colors.amber.withValues(alpha: 0.2), blurRadius: 40)
-                ]
+                  BoxShadow(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    blurRadius: 40,
+                  ),
+                ],
               ),
-              child: const Icon(Icons.star_rounded, size: 80, color: Colors.amber),
+              child: const Icon(
+                Icons.star_rounded,
+                size: 80,
+                color: Colors.amber,
+              ),
             ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
             const SizedBox(height: 32),
             Text(
@@ -131,7 +161,7 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
                     color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 20,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Row(
@@ -147,8 +177,12 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
                       scale: _rating > index ? 1.2 : 1.0,
                       duration: const Duration(milliseconds: 200),
                       child: Icon(
-                        _rating > index ? Icons.star_rounded : Icons.star_outline_rounded,
-                        color: _rating > index ? Colors.amber : Colors.grey.shade300,
+                        _rating > index
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        color: _rating > index
+                            ? Colors.amber
+                            : Colors.grey.shade300,
                         size: 40,
                       ),
                     ),
@@ -162,7 +196,11 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 4))
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: TextField(
@@ -170,7 +208,10 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
                 maxLines: 4,
                 decoration: InputDecoration(
                   hintText: 'شاركنا تفاصيل أكثر (اختياري)...',
-                  hintStyle: TextStyle(color: Colors.grey.shade400, fontFamily: GoogleFonts.cairo().fontFamily),
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontFamily: GoogleFonts.cairo().fontFamily,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
                     borderSide: BorderSide.none,
@@ -187,14 +228,19 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 0,
               ),
               child: _isLoading
                   ? const SizedBox(
                       width: 24,
                       height: 24,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : Text(
                       'إرسال التقييم',

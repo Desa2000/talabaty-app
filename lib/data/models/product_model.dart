@@ -3,7 +3,11 @@ class ProductOption {
   final String name;
   final double extraPrice;
 
-  ProductOption({required this.id, required this.name, required this.extraPrice});
+  ProductOption({
+    required this.id,
+    required this.name,
+    required this.extraPrice,
+  });
 }
 
 class ProductOptionGroup {
@@ -31,8 +35,8 @@ class ProductAddOn {
   final bool isAvailable;
 
   ProductAddOn({
-    required this.id, 
-    required this.name, 
+    required this.id,
+    required this.name,
     required this.price,
     this.isAvailable = true,
   });
@@ -67,7 +71,7 @@ class ProductModel {
     required this.category,
     required this.price,
     this.discountPrice,
-    required this.stockQuantity,
+    int? stockQuantity,
     this.lowStockThreshold = 5,
     this.preparationTimeMinutes = 15,
     this.isAvailable = true,
@@ -75,9 +79,11 @@ class ProductModel {
     this.allowCustomerNotes = true,
     this.optionGroups = const [],
     this.addOns = const [],
-    required this.createdAt,
-    required this.updatedAt,
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : stockQuantity = stockQuantity ?? 0,
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? createdAt ?? DateTime.now();
 
   ProductModel copyWith({
     String? id,
@@ -110,7 +116,8 @@ class ProductModel {
       discountPrice: discountPrice ?? this.discountPrice,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
-      preparationTimeMinutes: preparationTimeMinutes ?? this.preparationTimeMinutes,
+      preparationTimeMinutes:
+          preparationTimeMinutes ?? this.preparationTimeMinutes,
       isAvailable: isAvailable ?? this.isAvailable,
       isFeatured: isFeatured ?? this.isFeatured,
       allowCustomerNotes: allowCustomerNotes ?? this.allowCustomerNotes,

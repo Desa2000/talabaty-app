@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/data_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
@@ -10,9 +12,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../data/models/order_model.dart';
 import '../../../../data/models/user_model.dart';
 import '../../../../data/models/store_model.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 
 class CourierJobsTab extends StatefulWidget {
   const CourierJobsTab({super.key});
@@ -23,18 +22,23 @@ class CourierJobsTab extends StatefulWidget {
 
 class _CourierJobsTabState extends State<CourierJobsTab> {
   final Set<String> _rejectedOrders = {};
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   bool _isOnline = false;
   String? _selectedOrderId;
-  
-  LatLng _currentLocation = const LatLng(15.5007, 32.5599); 
+
+  LatLng _currentLocation = const LatLng(15.5007, 32.5599);
   bool _isLoadingLocation = true;
-  bool _isMapReady = false;
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 
   Future<void> _determinePosition() async {
@@ -64,15 +68,19 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       return;
     }
 
-    final position = await Geolocator.getCurrentPosition();
-    if (mounted) {
-      setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
-        _isLoadingLocation = false;
-      });
-      if (_isMapReady) {
-        _mapController.move(_currentLocation, 14.0);
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        final newLoc = LatLng(position.latitude, position.longitude);
+        setState(() {
+          _currentLocation = newLoc;
+          _isLoadingLocation = false;
+        });
+
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLoc, 14.0));
       }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingLocation = false);
     }
   }
 
@@ -98,19 +106,33 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final dataProvider = context.watch<DataProvider>();
-    
+
     final courierId = auth.currentUser?.id ?? '';
     final courier = dataProvider.couriers.firstWhere(
       (c) => c.userId == courierId,
       orElse: () => dataProvider.couriers.isNotEmpty
           ? dataProvider.couriers.first
-          : CourierProfile(userId: courierId, nationalId: '123', dateOfBirth: '1995-01-01', emergencyPhone: '123', vehicleType: VehicleType.motorcycle),
-    ); 
+          : CourierProfile(
+              userId: courierId,
+              nationalId: '123',
+              dateOfBirth: '1995-01-01',
+              emergencyPhone: '123',
+              vehicleType: VehicleType.motorcycle,
+            ),
+    );
     final courierUser = dataProvider.users.firstWhere(
       (u) => u.id == courier.userId,
       orElse: () => dataProvider.users.isNotEmpty
           ? dataProvider.users.first
-          : UserModel(id: 'dummy', name: 'سائق تجريبي', email: '', phone: '123', password: '', role: UserRole.courier, createdAt: DateTime.now()),
+          : UserModel(
+              id: 'dummy',
+              name: 'سائق تجريبي',
+              email: '',
+              phone: '123',
+              password: '',
+              role: UserRole.courier,
+              createdAt: DateTime.now(),
+            ),
     );
 
     final myOrders = dataProvider.getOrdersForCourier(courier.userId);
@@ -124,9 +146,65 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
     final selectedOrder = _selectedOrderId != null
         ? availableOrders.cast<OrderModel?>().firstWhere((o) => o?.id == _selectedOrderId, orElse: () => null)
         : null;
-    
+
     final isOnline = _isOnline;
-    final Color hslPrimary = HSLColor.fromAHSL(1.0, 25.0, 1.0, 0.50).toColor();
+
+    // Build Google Map Markers
+    final Set<Marker> markers = {
+      // Courier Location Marker
+      Marker(
+        markerId: const MarkerId('courier_self'),
+        position: _currentLocation,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        infoWindow: const InfoWindow(title: 'موقعي الحالي'),
+      ),
+    };
+
+    // Store Markers for available orders
+    for (final order in availableOrders) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('store_${order.id}'),
+          position: LatLng(order.storeLat, order.storeLng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(title: 'محل ${order.storeId}'),
+          onTap: () {
+            setState(() {
+              _selectedOrderId = order.id;
+            });
+          },
+        ),
+      );
+    }
+
+    // Customer Destination Marker if order is selected
+    if (selectedOrder != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('customer_${selectedOrder.id}'),
+          position: LatLng(selectedOrder.customerLat, selectedOrder.customerLng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'موقع العميل'),
+        ),
+      );
+    }
+
+    // Polyline for selected order
+    final Set<Polyline> polylines = {};
+    if (selectedOrder != null) {
+      polylines.add(
+        Polyline(
+          polylineId: PolylineId('route_${selectedOrder.id}'),
+          points: [
+            _currentLocation,
+            LatLng(selectedOrder.storeLat, selectedOrder.storeLng),
+            LatLng(selectedOrder.customerLat, selectedOrder.customerLng),
+          ],
+          color: AppColors.primaryColor,
+          width: 5,
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -147,73 +225,18 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                     flex: 2,
                     child: Stack(
                       children: [
-                        FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            initialCenter: _currentLocation,
-                            initialZoom: 14.0,
-                            onMapReady: () {
-                              _isMapReady = true;
-                              if (!_isLoadingLocation) {
-                                _mapController.move(_currentLocation, 14.0);
-                              }
-                            },
+                        GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: _currentLocation,
+                            zoom: 14.0,
                           ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.talabaty.app',
-                            ),
-                            if (selectedOrder != null)
-                              PolylineLayer(
-                                polylines: [
-                                  Polyline(
-                                    points: [
-                                      _currentLocation,
-                                      LatLng(selectedOrder.storeLat, selectedOrder.storeLng),
-                                      LatLng(selectedOrder.customerLat, selectedOrder.customerLng),
-                                    ],
-                                    color: AppColors.primaryColor,
-                                    strokeWidth: 4.0,
-                                  ),
-                                ],
-                              ),
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: _currentLocation,
-                                  width: 50,
-                                  height: 50,
-                                  child: _isLoadingLocation 
-                                      ? const CircularProgressIndicator(color: AppColors.primaryColor)
-                                      : Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [BoxShadow(color: hslPrimary.withValues(alpha: 0.3), blurRadius: 10, spreadRadius: 2)],
-                                            border: Border.all(color: hslPrimary, width: 2),
-                                          ),
-                                          child: Icon(Icons.motorcycle_rounded, color: hslPrimary, size: 30),
-                                        ),
-                                ),
-                                ...availableOrders.map((order) {
-                                  return Marker(
-                                    point: LatLng(order.storeLat, order.storeLng),
-                                    width: 40,
-                                    height: 40,
-                                    child: const Icon(Icons.location_on_rounded, color: Colors.red, size: 40),
-                                  );
-                                }),
-                                if (selectedOrder != null)
-                                  Marker(
-                                    point: LatLng(selectedOrder.customerLat, selectedOrder.customerLng),
-                                    width: 45,
-                                    height: 45,
-                                    child: const Icon(Icons.person_pin_circle_rounded, color: Colors.blue, size: 45),
-                                  ),
-                              ],
-                            ),
-                          ],
+                          onMapCreated: (controller) {
+                            _mapController = controller;
+                          },
+                          markers: markers,
+                          polylines: polylines,
+                          zoomControlsEnabled: false,
+                          myLocationButtonEnabled: false,
                         ),
                         Center(
                           child: GestureDetector(
@@ -256,7 +279,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                       ],
                     ),
                   ),
-                  
+
                   Expanded(
                     flex: 3,
                     child: Container(
@@ -392,7 +415,26 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
       (s) => s.id == order.storeId,
       orElse: () => dataProvider.stores.isNotEmpty
           ? dataProvider.stores.first
-          : StoreModel(id: 'dummy', ownerId: '', name: 'متجر غير معروف', type: StoreType.restaurant, phone: '', area: '', street: '', landmark: '', latitude: 0, longitude: 0, openingTime: '', closingTime: '', preparationTime: '', minimumOrder: 0, deliveryFee: 0, status: '', rating: 0, ratingCount: 0),
+          : StoreModel(
+              id: 'dummy',
+              ownerId: '',
+              name: 'متجر غير معروف',
+              type: StoreType.restaurant,
+              phone: '',
+              area: '',
+              street: '',
+              landmark: '',
+              latitude: 0,
+              longitude: 0,
+              openingTime: '',
+              closingTime: '',
+              preparationTime: '',
+              minimumOrder: 0,
+              deliveryFee: 0,
+              status: '',
+              rating: 0,
+              ratingCount: 0,
+            ),
     );
     return GestureDetector(
       onTap: () {
@@ -400,9 +442,13 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
           _selectedOrderId = isSelected ? null : order.id;
         });
         if (_selectedOrderId != null) {
-          _mapController.move(LatLng(order.storeLat, order.storeLng), 14.5);
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(LatLng(order.storeLat, order.storeLng), 14.5),
+          );
         } else {
-          _mapController.move(_currentLocation, 14.0);
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(_currentLocation, 14.0),
+          );
         }
       },
       child: Container(
@@ -468,13 +514,13 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.only(right: 20), 
+              padding: const EdgeInsets.only(right: 20),
               child: SizedBox(
-                height: 20, 
+                height: 20,
                 child: CustomPaint(
                   painter: DashedLinePainter(),
-                )
-              )
+                ),
+              ),
             ),
             Row(
               children: [
@@ -498,8 +544,8 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                       });
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red, 
-                      side: const BorderSide(color: Colors.red, width: 1.5), 
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -514,7 +560,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                       dataProvider.courierAcceptOrder(order.id, courierId);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor, 
+                      backgroundColor: AppColors.primaryColor,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
@@ -547,4 +593,3 @@ class DashedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
-

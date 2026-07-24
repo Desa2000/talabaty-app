@@ -13,15 +13,25 @@ class AddressModel {
 
   AddressModel({
     required this.id,
-    required this.title,
-    required this.city,
-    required this.area,
-    required this.street,
-    required this.landmark,
+    String? title,
+    String? label,
+    this.city = '',
+    this.area = '',
+    this.street = '',
+    this.landmark = '',
     required this.latitude,
     required this.longitude,
-    required this.phone,
-  });
+    this.phone = '',
+    bool isDefault = false,
+  }) : title = title ?? label ?? '';
+
+  String get address {
+    return [
+      street,
+      area,
+      city,
+    ].where((part) => part.trim().isNotEmpty).join(', ');
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -84,12 +94,17 @@ class UserModel {
       phone: json['phone'] ?? '',
       email: json['email'],
       password: json['password'] ?? '',
-      role: UserRole.values.firstWhere((e) => e.toString() == json['role'], orElse: () => UserRole.customer),
+      role: UserRole.values.firstWhere(
+        (e) => e.toString() == json['role'],
+        orElse: () => UserRole.customer,
+      ),
       profileImage: json['profileImage'],
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       fcmToken: json['fcmToken'],
-      savedAddresses: json['savedAddresses'] != null 
-          ? (json['savedAddresses'] as List).map((i) => AddressModel.fromJson(i)).toList() 
+      savedAddresses: json['savedAddresses'] != null
+          ? (json['savedAddresses'] as List)
+                .map((i) => AddressModel.fromJson(i))
+                .toList()
           : null,
     );
   }

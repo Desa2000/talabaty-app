@@ -44,14 +44,18 @@ class StoreApiService {
       id: json['id'] ?? '',
       storeId: json['storeId'] ?? '',
       name: json['nameAr'] ?? json['nameEn'] ?? json['name'] ?? '',
-      description: json['descriptionAr'] ?? json['descriptionEn'] ?? json['description'] ?? '',
+      description:
+          json['descriptionAr'] ??
+          json['descriptionEn'] ??
+          json['description'] ??
+          '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       discountPrice: (json['discountPrice'] as num?)?.toDouble(),
       image: json['imageUrl'] ?? 'assets/images/placeholder_product.png',
-      category: json['category']?['nameAr'] ?? json['category']?['nameEn'] ?? 'أخرى',
+      category:
+          json['category']?['nameAr'] ?? json['category']?['nameEn'] ?? 'أخرى',
       isAvailable: json['isAvailable'] ?? true,
       stockQuantity: json['stock'] ?? 100,
-      unit: json['unit'] ?? 'قطعة',
     );
   }
 
@@ -74,7 +78,9 @@ class StoreApiService {
       );
 
       final List data = response.data as List;
-      return data.map((json) => _parseStore(json as Map<String, dynamic>)).toList();
+      return data
+          .map((json) => _parseStore(json as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException
@@ -93,10 +99,7 @@ class StoreApiService {
           .map((p) => _parseProduct(p as Map<String, dynamic>))
           .toList();
 
-      return {
-        'store': store,
-        'products': products,
-      };
+      return {'store': store, 'products': products};
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException

@@ -133,6 +133,7 @@ model User {
   // Order relationships
   customerOrders  Order[]          @relation("CustomerOrders")
   courierOrders   Order[]          @relation("CourierOrders")
+  reviews         Review[]
 }
 
 model CustomerProfile {
@@ -192,12 +193,15 @@ model Store {
   deliveryFee       Float           @default(500.0)
   minOrderAmount    Float           @default(0.0)
   estimatedPrepTime Int             @default(20) // in minutes
+  rating            Float           @default(5.0)
+  reviewCount       Int             @default(0)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   products          Product[]
   categories        ProductCategory[]
   orders            Order[]
+  reviews           Review[]
 }
 
 model ProductCategory {
@@ -278,6 +282,7 @@ model Order {
   statusHistory     OrderStatusHistory[]
   payments          Payment[]
   locationLogs      CourierLocationLog[]
+  review            Review?
 }
 
 model OrderItem {
@@ -397,5 +402,19 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
+model Review {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
 
 

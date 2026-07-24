@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -45,13 +46,20 @@ class TalabatyMarkerFactory {
     // Draw center dot
     canvas.drawCircle(center, 12, fillPaint);
 
-    final ui.Image image = await pictureRecorder.endRecording().toImage(width, height);
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final ui.Image image = await pictureRecorder.endRecording().toImage(
+      width,
+      height,
+    );
+    final ByteData? byteData = await image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
   /// Create Merchant Store Marker based on Category (RESTAURANT, SUPERMARKET, PHARMACY)
-  static Future<BitmapDescriptor> createMerchantMarker({String category = 'RESTAURANT'}) async {
+  static Future<BitmapDescriptor> createMerchantMarker({
+    String category = 'RESTAURANT',
+  }) async {
     const int width = 130;
     const int height = 130;
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
@@ -88,10 +96,18 @@ class TalabatyMarkerFactory {
 
     // Inner icon representation
     final Paint iconFill = Paint()..color = categoryBg;
-    canvas.drawRect(Rect.fromCenter(center: center, width: 22, height: 18), iconFill);
+    canvas.drawRect(
+      Rect.fromCenter(center: center, width: 22, height: 18),
+      iconFill,
+    );
 
-    final ui.Image image = await pictureRecorder.endRecording().toImage(width, height);
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final ui.Image image = await pictureRecorder.endRecording().toImage(
+      width,
+      height,
+    );
+    final ByteData? byteData = await image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
@@ -127,8 +143,13 @@ class TalabatyMarkerFactory {
 
     canvas.drawPath(arrowPath, whitePaint);
 
-    final ui.Image image = await pictureRecorder.endRecording().toImage(width, height);
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final ui.Image image = await pictureRecorder.endRecording().toImage(
+      width,
+      height,
+    );
+    final ByteData? byteData = await image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 }

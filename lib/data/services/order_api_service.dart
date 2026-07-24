@@ -136,4 +136,25 @@ class OrderApiService {
     final response = await _apiClient.dio.post('/orders/$orderId/cancel');
     return response.data as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>> rateOrder({
+    required String orderId,
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/$orderId/rate',
+        data: {
+          'rating': rating,
+          'comment': comment,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل تقييم الطلب');
+    }
+  }
 }

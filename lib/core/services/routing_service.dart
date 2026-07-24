@@ -1,92 +1,104 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+// ─── Route result returned from backend ──────────────────────────────────────
 class RouteResult {
   final List<LatLng> points;
   final double distanceInMeters;
   final double durationInSeconds;
+  final String source; // 'GOOGLE_ROUTES' | 'FALLBACK_OSRM' | 'FALLBACK_HAVERSINE'
 
-  RouteResult({
+  const RouteResult({
     required this.points,
     required this.distanceInMeters,
     required this.durationInSeconds,
+    required this.source,
   });
 }
 
+// ─── Backend-proxied routing (no Google key in Flutter) ──────────────────────
 class RoutingService {
-  static const String _backendApiUrl = 'https://api.mytalabaty.com/api/routing/route';
-  static const String _osrmUrl = 'http://router.project-osrm.org/route/v1/driving';
+  static const String _backendApiUrl =
+      'https://api.mytalabaty.com/api/routing/route';
 
-  Future<RouteResult?> getRoute(LatLng start, LatLng end, {String vehicleType = 'MOTORCYCLE'}) async {
-    // 1. Try Backend Routes API Endpoint
+  /// Fetches a route from the backend.
+  /// Falls back to two-point straight line on any network failure.
+  Future<RouteResult?> getRoute(
+    LatLng start,
+    LatLng end, {
+    String vehicleType = 'MOTORCYCLE',
+  }) async {
     try {
-      final response = await http.post(
-        Uri.parse(_backendApiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'origin': {'latitude': start.latitude, 'longitude': start.longitude},
-          'destination': {'latitude': end.latitude, 'longitude': end.longitude},
-          'vehicleType': vehicleType,
-        }),
-      ).timeout(const Duration(seconds: 4));
+      final response = await http
+          .post(
+            Uri.parse(_backendApiUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'origin': {
+                'latitude': start.latitude,
+                'longitude': start.longitude,
+              },
+              'destination': {
+                'latitude': end.latitude,
+                'longitude': end.longitude,
+              },
+              'vehicleType': vehicleType,
+            }),
+          )
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['encodedPolyline'] != null && (data['encodedPolyline'] as String).isNotEmpty) {
-          final points = _decodePolyline(data['encodedPolyline']);
-          return RouteResult(
-            points: points,
-            distanceInMeters: (data['distanceMeters'] as num).toDouble(),
-            durationInSeconds: (data['durationSeconds'] as num).toDouble(),
-          );
-        }
+        final encoded = (data['encodedPolyline'] as String?) ?? '';
+        final points = encoded.isNotEmpty
+            ? _decodePolyline(encoded)
+            : [start, end];
+
+        return RouteResult(
+          points: points,
+          distanceInMeters: (data['distanceMeters'] as num).toDouble(),
+          durationInSeconds: (data['durationSeconds'] as num).toDouble(),
+          source: data['status'] ?? 'UNKNOWN',
+        );
       }
     } catch (e) {
-      debugPrint('Backend routing fallback to OSRM: $e');
+      debugPrint('[RoutingService] backend route failed: $e');
     }
 
-    // 2. Fallback to OSRM
-    try {
-      final url = Uri.parse(
-          '$_osrmUrl/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson');
-      final response = await http.get(url).timeout(const Duration(seconds: 4));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['code'] == 'Ok' && data['routes'] != null && data['routes'].isNotEmpty) {
-          final route = data['routes'][0];
-          final geometry = route['geometry'];
-          final coordinates = geometry['coordinates'] as List;
-
-          final List<LatLng> points = coordinates.map((coord) {
-            return LatLng(coord[1].toDouble(), coord[0].toDouble());
-          }).toList();
-
-          return RouteResult(
-            points: points,
-            distanceInMeters: (route['distance'] as num).toDouble(),
-            durationInSeconds: (route['duration'] as num).toDouble(),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('OSRM routing failed, using straight-line fallback: $e');
-    }
-
-    // 3. Fallback to Straight-Line
+    // Straight-line fallback
     return RouteResult(
       points: [start, end],
-      distanceInMeters: 2500,
-      durationInSeconds: 600,
+      distanceInMeters: _haversineMeters(start, end),
+      durationInSeconds: _haversineMeters(start, end) / 8.0, // ~28 km/h
+      source: 'FALLBACK_HAVERSINE',
     );
   }
 
-  /// Decode Google Encoded Polyline String to List of LatLng points
+  // ─── Haversine (client-side, diagnostics / fallback only) ──────────────────
+  static double _haversineMeters(LatLng a, LatLng b) {
+    const R = 6371000.0;
+    final dLat = _rad(b.latitude - a.latitude);
+    final dLon = _rad(b.longitude - a.longitude);
+    final x = (dLat / 2).abs();
+    final y = (dLon / 2).abs();
+    // simplified — good enough for pre-filtering
+    final dist = R *
+        2 *
+        _asin(
+          (x * x + _cos(_rad(a.latitude)) * _cos(_rad(b.latitude)) * y * y)
+              .clamp(0.0, 1.0)
+              .sqrt(),
+        );
+    return dist;
+  }
+
+  // ─── Google encoded-polyline decoder ───────────────────────────────────────
   List<LatLng> _decodePolyline(String encoded) {
-    List<LatLng> points = [];
-    int index = 0, len = encoded.length;
+    final List<LatLng> points = [];
+    int index = 0;
+    final int len = encoded.length;
     int lat = 0, lng = 0;
 
     while (index < len) {
@@ -96,7 +108,7 @@ class RoutingService {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      final dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
       lat += dlat;
 
       shift = 0;
@@ -106,11 +118,30 @@ class RoutingService {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      final dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
       lng += dlng;
 
-      points.add(LatLng(lat / 1E5, lng / 1E5));
+      points.add(LatLng(lat / 1e5, lng / 1e5));
     }
     return points;
+  }
+
+  static double _rad(double deg) => deg * 3.141592653589793 / 180;
+  static double _cos(double v) => v < -1 ? -1 : (v > 1 ? 1 : v);
+  static double _asin(double v) {
+    // Taylor approximation (accurate enough for display)
+    return v + (v * v * v) / 6.0 + (3 * v * v * v * v * v) / 40.0;
+  }
+}
+
+extension _NumSqrt on double {
+  double sqrt() => this < 0 ? 0 : _sqrt(this);
+  static double _sqrt(double v) {
+    double x = v, y = 1.0;
+    while ((x - y) > 0.0001) {
+      x = (x + y) / 2;
+      y = v / x;
+    }
+    return x;
   }
 }

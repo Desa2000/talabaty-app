@@ -159,6 +159,34 @@ class AuthApiService {
     }
   }
 
+  Future<Map<String, dynamic>> otpLogin({
+    required String identifier,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/api/auth/otp-login',
+        data: {'identifier': identifier},
+      );
+
+      if (response.data != null && response.data['exists'] == true) {
+        final user = _parseUser(response.data['user']);
+        return {
+          'exists': true,
+          'user': user,
+          'accessToken': response.data['accessToken'],
+          'refreshToken': response.data['refreshToken'],
+        };
+      }
+      return {'exists': false};
+    } on DioException catch (e) {
+      final apiEx = e.error is ApiException ? e.error as ApiException : ApiException.fromDioException(e);
+      if (apiEx.statusCode == 404) {
+        return {'exists': false};
+      }
+      throw apiEx;
+    }
+  }
+
   Future<void> logout() async {
     try {
       final refreshToken = await _apiClient.getRefreshToken();

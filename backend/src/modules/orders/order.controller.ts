@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../utils/prisma';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { io } from '../../server';
+import { RoutingService } from '../../services/routing.service';
 
 // Helper to generate readable order number
 function generateOrderNumber(): string {
@@ -401,7 +402,56 @@ export const merchantReadyForPickup = async (req: Request, res: Response) => {
     });
 
     io.to(`order_${id}`).emit('order.status_updated', updated);
-    io.to('couriers_available').emit('courier.offer_received', updated);
+
+    // ── Smart courier matching ─────────────────────────────────────────────
+    // 1. Pull all APPROVED + AVAILABLE couriers who have a recent location
+    const availableCouriers = await prisma.courierProfile.findMany({
+      where: {
+        verificationStatus: 'APPROVED',
+        status: 'AVAILABLE',
+        isOnline: true,
+        currentLatitude: { not: null },
+        currentLongitude: { not: null },
+      },
+      select: {
+        userId: true,
+        currentLatitude: true,
+        currentLongitude: true,
+      },
+    });
+
+    if (availableCouriers.length === 0) {
+      // No one available — broadcast to room so admin can handle
+      io.to('couriers_available').emit('courier.offer_received', updated);
+    } else {
+      // 2. Haversine shortlist → Route Matrix → targeted offer
+      const storeLat = order.store.latitude ?? 15.5007;
+      const storeLng = order.store.longitude ?? 32.5599;
+
+      const candidates = availableCouriers.map((c) => ({
+        courierId: c.userId,
+        lat: c.currentLatitude as number,
+        lng: c.currentLongitude as number,
+      }));
+
+      const bestCourierId = await RoutingService.findBestCourier(
+        candidates,
+        storeLat,
+        storeLng,
+        5 // max shortlist before Route Matrix
+      );
+
+      // Send targeted offer to best courier, also broadcast to all as fallback
+      if (bestCourierId) {
+        io.to(`user_${bestCourierId}`).emit('courier.offer_received', {
+          ...updated,
+          _targeted: true,
+        });
+      }
+      // Also broadcast to room so other couriers can accept if targeted one ignores
+      io.to('couriers_available').emit('courier.offer_received', updated);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     return res.json(updated);
   } catch (error: any) {
@@ -693,3 +743,82 @@ export const customerCancelOrder = async (req: Request, res: Response) => {
     return res.status(500).json({ error: error.message || 'فشل إلغاء الطلب' });
   }
 };
+
+const rateOrderSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().optional(),
+});
+
+export const rateOrder = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthenticatedRequest).user?.id;
+    const { id } = req.params;
+    const validated = rateOrderSchema.parse(req.body);
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'الطلب غير موجود' });
+    }
+
+    if (order.customerId !== userId) {
+      return res.status(403).json({ error: 'يمكن فقط للعميل صاحب الطلب تقييم هذا الطلب' });
+    }
+
+    if (order.status !== 'DELIVERED' && order.status !== 'COMPLETED') {
+      return res.status(400).json({ error: 'يمكن فقط تقييم الطلبات المكتملة أو المسلمة' });
+    }
+
+    const existingReview = await prisma.review.findUnique({
+      where: { orderId: id },
+    });
+
+    if (existingReview) {
+      return res.status(400).json({ error: 'لقد قمت بتقييم هذا الطلب من قبل' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const review = await tx.review.create({
+        data: {
+          orderId: id,
+          storeId: order.storeId,
+          userId: userId!,
+          rating: validated.rating,
+          comment: validated.comment || null,
+        },
+      });
+
+      const storeReviews = await tx.review.findMany({
+        where: { storeId: order.storeId },
+        select: { rating: true },
+      });
+
+      const count = storeReviews.length;
+      const sum = storeReviews.reduce((acc, r) => acc + r.rating, 0);
+      const avgRating = count > 0 ? Math.round((sum / count) * 10) / 10 : 5.0;
+
+      await tx.store.update({
+        where: { id: order.storeId },
+        data: {
+          rating: avgRating,
+          reviewCount: count,
+        },
+      });
+
+      return review;
+    });
+
+    return res.status(201).json({
+      message: 'تم تقييم الطلب بنجاح',
+      review: result,
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'بيانات التقييم غير صالحة', details: error.errors });
+    }
+    return res.status(500).json({ error: error.message || 'فشل تقييم الطلب' });
+  }
+};
+

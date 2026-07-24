@@ -1,15 +1,15 @@
-import 'package:talabaty_app/core/widgets/custom_image.dart';
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:async';
-import 'package:talabaty_app/core/constants/app_colors.dart';
-import 'package:talabaty_app/core/constants/enums.dart';
-import 'package:talabaty_app/core/providers/data_provider.dart';
-import 'package:talabaty_app/core/services/routing_service.dart';
-import 'package:talabaty_app/data/models/user_model.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/enums.dart';
+import '../../../core/providers/data_provider.dart';
+import '../../../core/services/routing_service.dart';
+import '../../../data/models/order_model.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -19,527 +19,451 @@ class OrderTrackingScreen extends StatefulWidget {
   State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
 }
 
-class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
-  final MapController _mapController = MapController();
+class _OrderTrackingScreenState extends State<OrderTrackingScreen>
+    with TickerProviderStateMixin {
   final RoutingService _routingService = RoutingService();
-  
+  GoogleMapController? _mapController;
+
   List<LatLng> _routePoints = [];
-  double _distanceInMeters = 0.0;
-  double _durationInSeconds = 0.0;
+  double _distanceMeters = 0;
+  double _durationSecs = 0;
   bool _isLoadingRoute = true;
-  Timer? _locationTimer;
+
+  // Courier position (from Socket)
+  LatLng? _courierPos;
+  double _courierBearing = 0;
+
+  // Smooth animation
+  late AnimationController _animController;
+  late Animation<double> _anim;
+  LatLng? _animStart;
+  LatLng? _animEnd;
+
+  Timer? _etaRefreshTimer;
+  DateTime? _lastRouteRefresh;
+  StreamSubscription? _socketSub;
+
+  static const _refreshInterval = Duration(minutes: 3);
+
+  OrderModel? get _order {
+    try {
+      return context.read<DataProvider>().orders.firstWhere(
+        (o) => o.id == widget.orderId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  LatLng get _merchantPos =>
+      LatLng(_order?.storeLat ?? 15.5007, _order?.storeLng ?? 32.5599);
+
+  LatLng get _customerPos =>
+      LatLng(_order?.customerLat ?? 15.5500, _order?.customerLng ?? 32.5500);
+
+  bool get _isPickedUp {
+    final s = _order?.status;
+    return s == OrderStatus.pickedUp ||
+        s == OrderStatus.onTheWay ||
+        s == OrderStatus.delivered;
+  }
+
+  LatLng get _routeOrigin =>
+      _courierPos ?? (_isPickedUp ? _merchantPos : _merchantPos);
+
+  LatLng get _routeDest => _isPickedUp ? _customerPos : _merchantPos;
 
   @override
   void initState() {
     super.initState();
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _anim = CurvedAnimation(parent: _animController, curve: Curves.easeInOut);
+    _animController.addListener(_onAnimTick);
+
     _fetchRoute();
-    
-    // Simulate live tracking updates
-    _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted) {
-        _fetchRoute();
-      }
+
+    _etaRefreshTimer = Timer.periodic(_refreshInterval, (_) {
+      if (mounted) _maybeFetchRoute();
     });
+
+    // Listen to socket events from DataProvider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listenToSocketUpdates();
+    });
+  }
+
+  void _listenToSocketUpdates() {
+    final dp = context.read<DataProvider>();
+    dp.addCourierLocationListener(widget.orderId, _onCourierLocationUpdate);
+  }
+
+  void _onCourierLocationUpdate(double lat, double lng, double heading) {
+    if (!mounted) return;
+    final newPos = LatLng(lat, lng);
+
+    if (_courierPos != null) {
+      _animStart = _courierPos;
+      _animEnd = newPos;
+      _animController.forward(from: 0);
+    }
+
+    setState(() {
+      _courierBearing = heading;
+      if (_courierPos == null) _courierPos = newPos;
+    });
+  }
+
+  void _onAnimTick() {
+    if (_animStart == null || _animEnd == null) return;
+    final t = _anim.value;
+    setState(() {
+      _courierPos = LatLng(
+        _animStart!.latitude + (_animEnd!.latitude - _animStart!.latitude) * t,
+        _animStart!.longitude +
+            (_animEnd!.longitude - _animStart!.longitude) * t,
+      );
+    });
+  }
+
+  Future<void> _fetchRoute() async {
+    if (!mounted) return;
+    setState(() => _isLoadingRoute = true);
+
+    final result = await _routingService.getRoute(_routeOrigin, _routeDest);
+
+    if (!mounted) return;
+    setState(() {
+      _routePoints = result?.points ?? [_routeOrigin, _routeDest];
+      _distanceMeters = result?.distanceInMeters ?? 0;
+      _durationSecs = result?.durationInSeconds ?? 0;
+      _isLoadingRoute = false;
+      _lastRouteRefresh = DateTime.now();
+    });
+  }
+
+  void _maybeFetchRoute() {
+    final now = DateTime.now();
+    if (_lastRouteRefresh == null ||
+        now.difference(_lastRouteRefresh!) >= _refreshInterval) {
+      _fetchRoute();
+    }
   }
 
   @override
   void dispose() {
-    _mapController.dispose();
-    _locationTimer?.cancel();
+    context.read<DataProvider>().removeCourierLocationListener(widget.orderId);
+    _etaRefreshTimer?.cancel();
+    _animController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchRoute() async {
-    // Guard: the Timer may fire after dispose(); bail early if unmounted.
-    if (!mounted) return;
-    final dataProvider = context.read<DataProvider>();
-    final order = dataProvider.orders.where((o) => o.id == widget.orderId).firstOrNull
-        ?? (dataProvider.orders.isNotEmpty ? dataProvider.orders.first : null);
-    if (order == null) return; // Orders not loaded yet; skip route fetch
-    
-    LatLng startPoint = LatLng(order.storeLat, order.storeLng);
-    if (order.courierLat != null && order.courierLng != null) {
-      startPoint = LatLng(order.courierLat!, order.courierLng!);
-    }
-    
-    final endPoint = LatLng(order.customerLat, order.customerLng);
-    final result = await _routingService.getRoute(startPoint, endPoint);
-    
-    if (mounted) {
-      setState(() {
-        if (result != null) {
-          _routePoints = result.points;
-          _distanceInMeters = result.distanceInMeters;
-          _durationInSeconds = result.durationInSeconds;
-        } else {
-          _routePoints = [startPoint, endPoint];
-        }
-        _isLoadingRoute = false;
-      });
-      _fitMapBounds(startPoint, endPoint);
-    }
-  }
-
-  void _fitMapBounds(LatLng start, LatLng end) {
-    try {
-      final bounds = LatLngBounds.fromPoints([start, end]);
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.only(top: 80, bottom: 80, left: 50, right: 50),
-        )
-      );
-    } catch (e) {
-      // Map not fully initialized
-    }
-  }
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final dataProvider = context.watch<DataProvider>();
-    // Safe fallbacks: .first on an empty list throws StateError
-    final order = dataProvider.orders.where((o) => o.id == widget.orderId).firstOrNull
-        ?? (dataProvider.orders.isNotEmpty ? dataProvider.orders.first : null);
+    final order = _order;
     if (order == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final store = dataProvider.stores.where((s) => s.id == order.storeId).firstOrNull
-        ?? (dataProvider.stores.isNotEmpty ? dataProvider.stores.first : null);
-    if (store == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    
-    LatLng currentLoc = LatLng(order.storeLat, order.storeLng);
-    if (order.courierLat != null && order.courierLng != null) {
-      currentLoc = LatLng(order.courierLat!, order.courierLng!);
-    }
-    final customerLoc = LatLng(order.customerLat, order.customerLng);
-
-    int etaMinutes = (_durationInSeconds / 60).ceil();
-    if (etaMinutes == 0 && order.status != OrderStatus.delivered) etaMinutes = 5;
-
-    // Premium visual status label
-    String statusText = 'في الطريق';
-    if (order.status == OrderStatus.delivered) {
-      statusText = 'تم التوصيل';
-    } else if (order.status == OrderStatus.preparing) {
-      statusText = 'جاري التحضير';
-    } else if (order.status == OrderStatus.readyForPickup) {
-      statusText = 'جاهز للاستلام';
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F1114),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primaryColor),
+        ),
+      );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFF5A00), // Vibrant Brand Orange
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 1. Header Title Banner
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                  child: Center(
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontSize: 26,
-                          height: 1.3,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'Cairo',
-                        ),
-                        children: [
-                          TextSpan(text: 'تتبع طلبك\n', style: TextStyle(color: Colors.white)), 
-                          TextSpan(text: 'من البداية حتى الاستلام', style: TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                // 2. Map Container
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        )
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                      child: Stack(
-                        children: [
-                          // The actual map widget
-                          FlutterMap(
-                            mapController: _mapController,
-                            options: MapOptions(
-                              initialCenter: currentLoc,
-                              initialZoom: 14.0,
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                                subdomains: const ['a', 'b', 'c', 'd'],
-                                userAgentPackageName: 'com.talabaty.app',
-                              ),
-                              PolylineLayer(
-                                polylines: [
-                                  Polyline(
-                                    points: _routePoints,
-                                    color: Colors.black87,
-                                    strokeWidth: 4,
-                                  ),
-                                ],
-                              ),
-                              MarkerLayer(
-                                markers: [
-                                  // Customer Home Pin (Orange pin dropped from black label)
-                                  Marker(
-                                    point: customerLoc,
-                                    width: 100,
-                                    height: 70,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        const Positioned(
-                                          bottom: 4,
-                                          child: Icon(Icons.location_on, color: Color(0xFFFF5A00), size: 36),
-                                        ),
-                                        Positioned(
-                                          top: 0,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black,
-                                              borderRadius: BorderRadius.circular(20),
-                                              boxShadow: const [
-                                                BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
-                                              ],
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: const [
-                                                Icon(Icons.home, color: Colors.white, size: 22),
-                                                Text('المنزل', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Cairo')),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  
-                                  // Courier / Delivery Blue Dot Marker
-                                  Marker(
-                                    point: currentLoc,
-                                    width: 40,
-                                    height: 40,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryColor, 
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 3),
-                                        boxShadow: const [
-                                          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          
-                          // Floating Close Icon inside Map Area
-                          Positioned(
-                            top: 16,
-                            left: 16,
-                            child: GestureDetector(
-                              onTap: () => context.go('/customer'),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
-                                  ],
-                                ),
-                                child: const Icon(Icons.close, color: Colors.black, size: 20),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+      backgroundColor: const Color(0xFF0F1114),
+      body: Stack(
+        children: [
+          // ── Map ──────────────────────────────────────────────────────────
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _courierPos ?? _merchantPos,
+              zoom: 14.5,
             ),
-            
-            // 3. Floating Bottom Info Card
-            Align(
-              alignment: Alignment.bottomCenter,
+            onMapCreated: (c) async {
+              _mapController = c;
+              await c.setMapStyle(_talabatyMapStyle);
+            },
+            markers: _buildMarkers(order),
+            polylines: _buildPolylines(),
+            myLocationEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+          ),
+
+          // Loading overlay
+          if (_isLoadingRoute)
+            const Center(
+              child: CircularProgressIndicator(color: AppColors.primaryColor),
+            ),
+
+          // ── Top back button ──────────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 16,
+            child: GestureDetector(
+              onTap: () => context.pop(),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+                  color: const Color(0xFF1C2026).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Color(0xFF2E3238)),
                 ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Bottom info card ─────────────────────────────────────────────
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildInfoCard(order),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Set<Marker> _buildMarkers(OrderModel order) {
+    final markers = <Marker>{};
+
+    // Courier arrow
+    if (_courierPos != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('courier'),
+          position: _courierPos!,
+          rotation: _courierBearing,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: const InfoWindow(title: 'المندوب'),
+        ),
+      );
+    }
+
+    // Merchant
+    markers.add(
+      Marker(
+        markerId: const MarkerId('merchant'),
+        position: _merchantPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: InfoWindow(title: order.storeId),
+      ),
+    );
+
+    // Customer destination
+    markers.add(
+      Marker(
+        markerId: const MarkerId('customer'),
+        position: _customerPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'موقع التوصيل'),
+      ),
+    );
+
+    return markers;
+  }
+
+  Set<Polyline> _buildPolylines() {
+    if (_routePoints.isEmpty) return {};
+    return {
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: _routePoints,
+        color: const Color(0xFFFF5722),
+        width: 5,
+        jointType: JointType.round,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+      ),
+    };
+  }
+
+  Widget _buildInfoCard(OrderModel order) {
+    final etaMins = (_durationSecs / 60).ceil();
+    final distKm = (_distanceMeters / 1000).toStringAsFixed(1);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C2026),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(top: BorderSide(color: Color(0xFF2E3238))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Status row
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF5722).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delivery_dining,
+                  color: Color(0xFFFF5722),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Restaurant Detail & Delivery Time Section
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: CustomImage(
-                                  imagePath: store.logo ?? '', 
-                                  fit: BoxFit.cover,
-                                  width: 28,
-                                  height: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  store.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  statusText,
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'الوقت المقدر للوصول',
-                                    style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '$etaMinutes دقائق',
-                                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, fontFamily: 'Cairo'),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'طلباتي',
-                                    style: TextStyle(color: Color(0xFFFF5A00), fontWeight: FontWeight.w900, fontSize: 19, fontFamily: 'Cairo'),
-                                  ),
-                                ],
-                              ),
-                              
-                              // Orange circular progress with motorcycle icon
-                              SizedBox(
-                                width: 68,
-                                height: 68,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    CircularProgressIndicator(
-                                      value: order.status == OrderStatus.delivered ? 1.0 : 0.75,
-                                      strokeWidth: 4.5,
-                                      backgroundColor: Colors.grey.shade100,
-                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF5A00)),
-                                    ),
-                                    Container(
-                                      width: 52,
-                                      height: 52,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFFFF0E5),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.motorcycle,
-                                        color: Color(0xFFFF5A00),
-                                        size: 26,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    Text(
+                      _statusLabel(order.status),
+                      style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
                     ),
-                    
-                    // Cream banner with thumb-up & delivery message
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAF7F2),
-                        border: Border(
-                          top: BorderSide(color: Colors.grey.shade100),
-                          bottom: BorderSide(color: Colors.grey.shade100),
-                        ),
+                    Text(
+                      _durationSecs > 0
+                          ? 'المتوقع: $etaMins دقيقة · $distKm كم'
+                          : 'جاري حساب الوقت...',
+                      style: GoogleFonts.cairo(
+                        color: const Color(0xFF9AA0A6),
+                        fontSize: 12,
                       ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.thumb_up, color: Color(0xFFFF5A00), size: 18),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "طلبك في طريقه إليك الآن، سنعلمك عند وصوله! 🛵",
-                              style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Delivery Agent Profile Section
-                    Builder(
-                      builder: (context) {
-                        // Fallback to mock delivery hero if no courier assigned to the order yet
-                        if (dataProvider.couriers.isEmpty) return const SizedBox.shrink();
-                        final courier = dataProvider.couriers.firstWhere(
-                          (c) => c.userId == order.courierId,
-                          orElse: () => dataProvider.couriers.first, // safe: list confirmed non-empty
-                        );
-                        final courierUser = dataProvider.users.firstWhere(
-                          (u) => u.id == courier.userId,
-                          orElse: () => dataProvider.users.firstWhere(
-                            (u) => u.role == UserRole.courier,
-                            orElse: () => dataProvider.users.isNotEmpty 
-                                ? dataProvider.users.first 
-                                : UserModel(
-                                    id: courier.userId,
-                                    name: 'سائق التوصيل',
-                                    phone: '',
-                                    password: '',
-                                    role: UserRole.courier,
-                                    createdAt: DateTime.now(),
-                                  ),
-                          ),
-                        );
-                        
-                        return Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF0E5),
-                                  shape: BoxShape.circle,
-                                  image: courierUser.profileImage != null
-                                      ? DecorationImage(
-                                          image: NetworkImage(courierUser.profileImage!),
-                                          fit: BoxFit.cover,
-                                        )
-                                      : null,
-                                ),
-                                child: courierUser.profileImage == null
-                                    ? const Icon(Icons.person, color: Color(0xFFFF5A00))
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      courierUser.name,
-                                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, fontFamily: 'Cairo'),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'هو كابتن التوصيل لطلبك اليوم',
-                                      style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade200),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(Icons.chat_bubble_outline, size: 20, color: Colors.black87),
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('قريباً: المحادثة المباشرة مع الكابتن', style: TextStyle(fontFamily: 'Cairo')),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade200),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(Icons.phone_outlined, size: 20, color: Colors.black87),
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('جاري الاتصال بـ ${courierUser.name}...', style: const TextStyle(fontFamily: 'Cairo')),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                   ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFF2E3238)),
+          const SizedBox(height: 8),
+
+          // Store name
+          Row(
+            children: [
+              const Icon(
+                Icons.storefront_outlined,
+                color: Color(0xFF9AA0A6),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                order.storeId,
+                style: GoogleFonts.cairo(color: Colors.white, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Address
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: Color(0xFF9AA0A6),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  order.address.address,
+                  style: GoogleFonts.cairo(
+                    color: const Color(0xFF9AA0A6),
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          if (order.status == OrderStatus.delivered) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'تم تسليم الطلب بنجاح',
+                    style: GoogleFonts.cairo(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
-}
 
+  String _statusLabel(OrderStatus? status) {
+    switch (status) {
+      case OrderStatus.assignedToCourier:
+        return 'المندوب في الطريق للمتجر';
+      case OrderStatus.courierGoingToStore:
+        return 'المندوب في الطريق للمتجر';
+      case OrderStatus.courierArrivedStore:
+        return 'المندوب في المتجر يستلم طلبك';
+      case OrderStatus.pickedUp:
+        return 'الطلب في الطريق إليك';
+      case OrderStatus.onTheWay:
+        return 'الطلب في الطريق إليك';
+      case OrderStatus.courierArrivedCustomer:
+        return 'المندوب وصل إليك!';
+      case OrderStatus.delivered:
+        return 'تم التسليم';
+      default:
+        return 'جاري تتبع طلبك...';
+    }
+  }
+
+  // ─── Talabaty custom map style ──────────────────────────────────────────────
+  static const String _talabatyMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#faf7f2"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#4a4e54"}]},
+  {"featureType":"poi","stylers":[{"visibility":"off"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#ffe8df"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#ffab91"}]},
+  {"featureType":"transit","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#d4e6f1"}]}
+]
+''';
+}

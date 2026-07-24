@@ -14,6 +14,18 @@ SUPERADMIN_ACCESS.secure.json
 .swiftpm/
 migrate_working_dir/
 
+# API Keys — NEVER commit these
+local.properties.prod
+**/local.properties
+!android/local.properties.example
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -45,6 +57,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
 
 # Backend related
 **/backend/node_modules/

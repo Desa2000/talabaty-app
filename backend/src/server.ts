@@ -14,6 +14,7 @@ import {
   refresh,
   logout,
   getMe,
+  otpLogin,
 } from './modules/auth/auth.controller';
 import {
   getStores,
@@ -40,6 +41,7 @@ import {
   courierArrived,
   courierDelivered,
   customerCancelOrder,
+  rateOrder,
 } from './modules/orders/order.controller';
 import {
   getAddresses,
@@ -50,6 +52,7 @@ import {
   computeRouteHandler,
   calculateDeliveryFeeHandler,
 } from './modules/routing/routing.controller';
+import { routingStats } from './services/routing.service';
 import {
   updateCourierLocation,
   updateCourierStatus,
@@ -132,6 +135,7 @@ app.post('/api/auth/register/customer', registerCustomer);
 app.post('/api/auth/register/merchant', registerMerchant);
 app.post('/api/auth/register/courier', registerCourier);
 app.post('/api/auth/login', loginRateLimiter, login);
+app.post('/api/auth/otp-login', otpLogin);
 app.post('/api/auth/change-password', authenticate, changePassword);
 app.get('/api/admin/setup-verify', verifySetupToken);
 app.post('/api/admin/setup-password', completeFirstTimeSetup);
@@ -173,6 +177,7 @@ app.post('/api/orders/:id/arrived', authenticate, authorizeRoles('COURIER', 'ADM
 app.post('/api/orders/:id/delivered', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierDelivered);
 app.post('/api/orders/:id/completed', authenticate, courierDelivered);
 app.post('/api/orders/:id/cancel', authenticate, customerCancelOrder);
+app.post('/api/orders/:id/rate', authenticate, rateOrder);
 
 // 6. Address Routes
 app.get('/api/addresses', authenticate, getAddresses);
@@ -192,6 +197,16 @@ const financeRoles = ['SUPER_ADMIN', 'ADMIN', 'FINANCE'];
 const superAdminOnly = ['SUPER_ADMIN'];
 
 app.get('/api/admin/overview', authenticate, authorizeRoles(...adminRoles), getAdminOverview);
+// Usage monitoring: Google API call counters (in-memory, resets on restart)
+app.get('/api/admin/routing-stats', authenticate, authorizeRoles(...adminRoles), (_req, res) => {
+  res.json({
+    ...routingStats,
+    googleConfigured: !!(process.env.GOOGLE_ROUTES_API_KEY),
+    estimatedCostPerOrder: routingStats.computeRouteCalls > 0
+      ? `~${(routingStats.computeRouteCalls * 0.005 + routingStats.routeMatrixElementsTotal * 0.001).toFixed(3)} USD`
+      : 'No data yet',
+  });
+});
 app.get('/api/admin/orders', authenticate, authorizeRoles(...adminRoles), getAdminOrders);
 app.get('/api/admin/orders/:id', authenticate, authorizeRoles(...adminRoles), getAdminOrderById);
 app.post('/api/admin/orders/:id/reassign-courier', authenticate, authorizeRoles(...opsRoles), adminReassignCourier);

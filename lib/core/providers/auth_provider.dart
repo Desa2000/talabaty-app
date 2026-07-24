@@ -168,7 +168,7 @@ class AuthProvider extends ChangeNotifier {
     if (_generatedOtp == null || _pendingEmail == null) {
       _isLoading = false;
       notifyListeners();
-      onError('خطأ غير متوقع، الرجاء طلب الرمز مرة أخرى');
+      onError('انتهت صلاحية رمز التحقق، أرسل رمزاً جديداً');
       return null;
     }
 
@@ -183,42 +183,37 @@ class AuthProvider extends ChangeNotifier {
       return null;
     }
 
-    // OTP Correct! Login to REST Backend using Email & Password trick
-    final deterministicPassword = '$_pendingEmail$_secretSuffix';
-
     try {
-      final res = await _authApiService.login(
-        identifier: _pendingEmail!,
-        password: deterministicPassword,
-      );
+      final res = await _authApiService.otpLogin(identifier: _pendingEmail!);
 
       if (_isDisposed) return null;
 
-      final user = res['user'] as UserModel;
-      await ApiClient().saveTokens(
-        accessToken: res['accessToken'],
-        refreshToken: res['refreshToken'],
-      );
+      if (res['exists'] == true) {
+        final user = res['user'] as UserModel;
+        await ApiClient().saveTokens(
+          accessToken: res['accessToken'],
+          refreshToken: res['refreshToken'],
+        );
 
-      _currentUser = user;
-      _isLoading = false;
-      notifyListeners();
-      return user.role;
+        _currentUser = user;
+        _isLoading = false;
+        notifyListeners();
+        return user.role;
+      } else {
+        // User not found in DB -> return null so screen navigates to /register
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
     } on ApiException catch (e) {
       _isLoading = false;
       notifyListeners();
-      
-      // If user not found (status 401), we return null to trigger Register Screen navigation
-      if (e.statusCode == 401) {
-        return null; 
-      }
-      
       onError(e.message);
       return null;
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      onError(e.toString());
+      onError('حدث خطأ، حاول مرة أخرى');
       return null;
     }
   }

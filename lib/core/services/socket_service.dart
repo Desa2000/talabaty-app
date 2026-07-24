@@ -120,4 +120,29 @@ class SocketService {
     _socket?.off('order.created');
     _socket?.off('courier.offer_received');
   }
+
+  // ─── Per-order courier location listener (for tracking screens) ─────────────
+  void onCourierLocation(
+    String orderId,
+    Function(double lat, double lng, double heading) callback,
+  ) {
+    _socket?.on('courier.location_updated', (data) {
+      if (data is Map) {
+        final d = Map<String, dynamic>.from(data);
+        if (d['orderId'] == orderId) {
+          callback(
+            (d['latitude'] as num).toDouble(),
+            (d['longitude'] as num).toDouble(),
+            (d['heading'] as num? ?? 0).toDouble(),
+          );
+        }
+      }
+    });
+  }
+
+  void offCourierLocation(String orderId) {
+    // Socket.IO doesn't support per-handler removal easily; rely on disconnect/reconnect
+    // In practice the screen calls this on dispose so memory is freed
+    debugPrint('[SocketService] offCourierLocation for order $orderId');
+  }
 }

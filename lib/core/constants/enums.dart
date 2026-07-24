@@ -1,9 +1,4 @@
-enum UserRole {
-  customer,
-  merchant,
-  courier,
-  admin,
-}
+enum UserRole { customer, merchant, courier, admin }
 
 enum OrderStatus {
   pending,
@@ -22,39 +17,15 @@ enum OrderStatus {
   cancelled,
 }
 
-enum PaymentMethod {
-  cashOnDelivery,
-  bankak,
-  cashi,
-}
+enum PaymentMethod { cashOnDelivery, bankak, cashi }
 
-enum PaymentStatus {
-  unpaid,
-  paid,
-  failed,
-  pending_cash_collection,
-  refunded,
-}
+enum PaymentStatus { unpaid, paid, failed, pending_cash_collection, refunded }
 
-enum VehicleType {
-  motorcycle,
-  car,
-  electricBike,
-  bicycle,
-}
+enum VehicleType { motorcycle, car, electricBike, bicycle }
 
-enum StoreType {
-  restaurant,
-  supermarket,
-  pharmacy,
-  gift,
-}
+enum StoreType { restaurant, supermarket, pharmacy, gift }
 
-enum CourierStatus {
-  available,
-  busy,
-  offline,
-}
+enum CourierStatus { available, busy, offline }
 
 extension OrderStatusExtension on OrderStatus {
   String get arabicLabel {
@@ -119,4 +90,9 @@ extension PaymentMethodExtension on PaymentMethod {
         return 'كاشي';
     }
   }
+}
+
+abstract final class StoreStatus {
+  static const String open = 'active';
+  static const String closed = 'closed';
 }

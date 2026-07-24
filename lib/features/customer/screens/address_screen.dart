@@ -2,8 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,47 +26,30 @@ class AddressScreen extends StatelessWidget {
           // 1. The Map Background
           Positioned.fill(
             bottom: MediaQuery.of(context).size.height * 0.45,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: addressProvider.selectedAddress != null 
-                    ? LatLng(addressProvider.selectedAddress!.latitude, addressProvider.selectedAddress!.longitude)
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: addressProvider.selectedAddress != null
+                    ? LatLng(addressProvider.selectedAddress!.latitude,
+                        addressProvider.selectedAddress!.longitude)
                     : const LatLng(15.5007, 32.5599),
-                initialZoom: 15.0,
+                zoom: 15.0,
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                  userAgentPackageName: 'com.example.talabaty_app',
-                ),
-                if (addressProvider.selectedAddress != null)
-                  MarkerLayer(
-                    markers: [
+              markers: addressProvider.selectedAddress != null
+                  ? {
                       Marker(
-                        point: LatLng(addressProvider.selectedAddress!.latitude, addressProvider.selectedAddress!.longitude),
-                        width: 60,
-                        height: 60,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(color: AppColors.primaryColor.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))
-                                ]
-                              ),
-                              child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 24),
-                            ),
-                          ],
-                        ).animate(onPlay: (controller) => controller.repeat(reverse: true))
-                         .moveY(begin: 0, end: -8, duration: 800.ms, curve: Curves.easeInOut),
+                        markerId: const MarkerId('selected'),
+                        position: LatLng(
+                          addressProvider.selectedAddress!.latitude,
+                          addressProvider.selectedAddress!.longitude,
+                        ),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueOrange),
                       ),
-                    ],
-                  ),
-              ],
+                    }
+                  : {},
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              myLocationButtonEnabled: false,
             ),
           ),
 

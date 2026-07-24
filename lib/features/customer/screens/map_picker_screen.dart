@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -16,12 +15,11 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProviderStateMixin {
-  final MapController _mapController = MapController();
-  
-  // Default to Khartoum coordinates
-  LatLng _currentCenter = const LatLng(15.5007, 32.5599); 
+  GoogleMapController? _mapController;
+
+  // Default to Khartoum coordinates (15.5007, 32.5599)
+  LatLng _currentCenter = const LatLng(15.5007, 32.5599);
   bool _isLoading = true;
-  bool _isMapReady = false;
   String _currentAddressText = "جاري تحديد الموقع...";
   bool _isDragging = false;
 
@@ -29,6 +27,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _determinePosition();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 
   Future<void> _determinePosition() async {
@@ -63,18 +67,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
         timeLimit: const Duration(seconds: 10),
       );
       if (mounted) {
+        final newCenter = LatLng(position.latitude, position.longitude);
         setState(() {
-          _currentCenter = LatLng(position.latitude, position.longitude);
+          _currentCenter = newCenter;
           _isLoading = false;
           _updateAddressText();
         });
-        
-        if (_isMapReady) {
-          _mapController.move(_currentCenter, 15.0);
-        }
+
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(newCenter, 15.0));
       }
     } catch (e) {
-      _showLocationWarning('فشل في الحصول على الموقع الجغرافي. يرجى التأكد من قوة إشارة الـ GPS أو تحديد الموقع يدوياً.');
+      _showLocationWarning('فشل في الحصول على الموقع الجغرافي. يرجى تحديد الموقع يدوياً.');
       _finishLoading();
     }
   }
@@ -95,7 +98,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
         backgroundColor: Colors.red.shade400,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.all(16),
-      )
+      ),
     );
   }
 
@@ -111,41 +114,31 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
       backgroundColor: AppColors.backgroundLight,
       body: Stack(
         children: [
-          // 1. The Map Background
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _currentCenter,
-              initialZoom: 15.0,
-              onMapReady: () {
-                _isMapReady = true;
-                if (!_isLoading) {
-                  _mapController.move(_currentCenter, 15.0);
-                }
-              },
-              onPositionChanged: (position, hasGesture) {
-                if (hasGesture && position.center != null) {
-                  setState(() {
-                    _currentCenter = position.center!;
-                    _isDragging = true;
-                  });
-                }
-              },
-              onMapEvent: (event) {
-                if (event is MapEventMoveEnd) {
-                  setState(() {
-                    _isDragging = false;
-                    _updateAddressText();
-                  });
-                }
-              },
+          // 1. Google Map Background
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _currentCenter,
+              zoom: 15.0,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                userAgentPackageName: 'com.example.talabaty_app',
-              ),
-            ],
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+            onCameraMove: (position) {
+              setState(() {
+                _currentCenter = position.target;
+                _isDragging = true;
+              });
+            },
+            onCameraIdle: () {
+              setState(() {
+                _isDragging = false;
+                _updateAddressText();
+              });
+            },
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            myLocationButtonEnabled: false,
+            compassEnabled: false,
           ),
 
           // 2. Custom App Bar over map
@@ -198,7 +191,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
           // 3. Center Pin
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 40), // Offset for the pin point
+              padding: const EdgeInsets.only(bottom: 40), // Offset for pin point
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 transform: Matrix4.translationValues(0, _isDragging ? -15 : 0, 0),
@@ -213,7 +206,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(color: AppColors.primaryColor.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))
-                        ]
+                        ],
                       ),
                       child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 32),
                     ),
@@ -316,7 +309,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> with SingleTickerProv
                     onPressed: _isDragging || _isLoading
                         ? null
                         : () {
-                            // Return selected coordinates
+                            // Return selected GoogleMap LatLng
                             context.pop(_currentCenter);
                           },
                     style: ElevatedButton.styleFrom(

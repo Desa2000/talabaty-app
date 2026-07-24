@@ -9,6 +9,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/data_provider.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/constants/enums.dart';
+import '../../../core/network/api_exception.dart';
 import 'dart:async';
 
 class OtpScreen extends StatefulWidget {
@@ -111,9 +112,10 @@ class _OtpScreenState extends State<OtpScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final errorMsg = e is ApiException ? e.message : 'حدث خطأ، حاول مرة أخرى';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString(), style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 14)),
+            content: Text(errorMsg, style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 14)),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.error,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -312,13 +314,33 @@ class _OtpScreenState extends State<OtpScreen> {
                                       onPressed: () {
                                         setState(() => _resendTimer = 60);
                                         _startTimer();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('تم إعادة إرسال الكود بنجاح', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 14)),
-                                            behavior: SnackBarBehavior.floating,
-                                            backgroundColor: Colors.green,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          )
+                                        context.read<AuthProvider>().sendOtp(
+                                          phone: widget.phone,
+                                          email: widget.email,
+                                          onError: (err) {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(err, style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 14)),
+                                                  behavior: SnackBarBehavior.floating,
+                                                  backgroundColor: AppColors.error,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          onCodeSent: () {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('تم إعادة إرسال رمز التحقق بنجاح', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 14)),
+                                                  behavior: SnackBarBehavior.floating,
+                                                  backgroundColor: Colors.green,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                ),
+                                              );
+                                            }
+                                          },
                                         );
                                       },
                                       child: Text(

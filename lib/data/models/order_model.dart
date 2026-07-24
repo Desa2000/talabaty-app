@@ -20,6 +20,8 @@ class OrderModel {
   final String id;
   final String customerId;
   final String storeId;
+  final String? orderNumber;
+  final String? storeName;
   String? courierId;
   final List<CartItem> items;
   final AddressModel address;
@@ -47,6 +49,8 @@ class OrderModel {
     required this.id,
     required this.customerId,
     required this.storeId,
+    this.orderNumber,
+    this.storeName,
     this.courierId,
     required this.items,
     required this.address,
@@ -67,11 +71,31 @@ class OrderModel {
     required this.total,
     required this.createdAt,
     this.deliveredAt,
-  }) : statusHistory = statusHistory ?? [OrderStatusHistory(status: status, timestamp: createdAt, changedBy: 'System', note: 'Order placed')];
+  }) : statusHistory =
+           statusHistory ??
+           [
+             OrderStatusHistory(
+               status: status,
+               timestamp: createdAt,
+               changedBy: 'System',
+               note: 'Order placed',
+             ),
+           ];
 
-  void updateStatus(OrderStatus newStatus, String changedBy, {String note = ''}) {
+  void updateStatus(
+    OrderStatus newStatus,
+    String changedBy, {
+    String note = '',
+  }) {
     status = newStatus;
-    statusHistory.add(OrderStatusHistory(status: newStatus, timestamp: DateTime.now(), changedBy: changedBy, note: note));
+    statusHistory.add(
+      OrderStatusHistory(
+        status: newStatus,
+        timestamp: DateTime.now(),
+        changedBy: changedBy,
+        note: note,
+      ),
+    );
     if (newStatus == OrderStatus.delivered) {
       deliveredAt = DateTime.now();
     }

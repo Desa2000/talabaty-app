@@ -28,31 +28,50 @@ class ApiClient {
     dio.interceptors.add(
       QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _secureStorage.read(key: 'accessToken');
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
+          // Public auth endpoints must not send Authorization header
+          final path = options.path;
+          final isPublicAuth = path.contains('/api/auth/login') ||
+              path.contains('/api/auth/register') ||
+              path.contains('/api/auth/otp-login') ||
+              path.contains('/api/auth/refresh');
+
+          if (!isPublicAuth) {
+            final token = await _secureStorage.read(key: 'accessToken');
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           return handler.next(options);
         },
         onError: (DioException err, handler) async {
-          // If the error is 401 (Unauthorized), we try to refresh the token
+          // Wrap DioException error with structured ApiException
+          final apiException = ApiException.fromDioException(err);
+          final errWithApiEx = DioException(
+            requestOptions: err.requestOptions,
+            response: err.response,
+            type: err.type,
+            error: apiException,
+          );
+
+          // If 401 (Unauthorized) on a protected route, attempt token refresh
           if (err.response?.statusCode == 401) {
             final requestOptions = err.requestOptions;
-            
-            // Avoid infinite loops if refreshing itself fails
-            if (requestOptions.path.contains(ApiEndpoints.refresh) || 
-                requestOptions.path.contains(ApiEndpoints.login)) {
-              return handler.next(err);
+
+            // Avoid infinite loops if auth endpoints themselves return 401
+            if (requestOptions.path.contains(ApiEndpoints.refresh) ||
+                requestOptions.path.contains(ApiEndpoints.login) ||
+                requestOptions.path.contains('/api/auth/')) {
+              return handler.next(errWithApiEx);
             }
 
             try {
               final refreshToken = await _secureStorage.read(key: 'refreshToken');
               if (refreshToken == null) {
                 _handleSessionExpiry();
-                return handler.next(err);
+                return handler.next(errWithApiEx);
               }
 
-              // Perform the token refresh using a clean Dio instance
+              // Perform token refresh using a clean Dio instance
               final refreshDio = Dio(BaseOptions(baseUrl: ApiEndpoints.baseUrl));
               final response = await refreshDio.post(
                 ApiEndpoints.refresh,
@@ -63,28 +82,19 @@ class ApiClient {
                 final newAccessToken = response.data['accessToken'];
                 await _secureStorage.write(key: 'accessToken', value: newAccessToken);
 
-                // Update the Authorization header and retry the request
+                // Update Authorization header and retry the request
                 requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
-                
                 final cloneReq = await dio.fetch(requestOptions);
                 return handler.resolve(cloneReq);
               }
             } catch (refreshErr) {
               debugPrint('Token refresh failed: $refreshErr');
               _handleSessionExpiry();
-              return handler.next(err);
+              return handler.next(errWithApiEx);
             }
           }
 
-          // Otherwise return structured ApiException
-          return handler.next(
-            DioException(
-              requestOptions: err.requestOptions,
-              response: err.response,
-              type: err.type,
-              error: ApiException.fromDioException(err),
-            ),
-          );
+          return handler.next(errWithApiEx);
         },
       ),
     );

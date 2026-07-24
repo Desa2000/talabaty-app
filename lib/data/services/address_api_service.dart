@@ -24,7 +24,9 @@ class AddressApiService {
     try {
       final response = await _apiClient.dio.get('/addresses');
       final List data = response.data as List;
-      return data.map((json) => _parseAddress(json as Map<String, dynamic>)).toList();
+      return data
+          .map((json) => _parseAddress(json as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException

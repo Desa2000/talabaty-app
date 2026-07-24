@@ -32,7 +32,7 @@ class StoreModel {
     required this.phone,
     required this.area,
     required this.street,
-    required this.landmark,
+    this.landmark = '',
     required this.latitude,
     required this.longitude,
     required this.openingTime,
@@ -48,7 +48,6 @@ class StoreModel {
   String get imageUrl => logo ?? '';
   String get address => '$street, $area';
   String get merchantId => ownerId;
-
 
   StoreModel copyWith({
     String? id,

@@ -22,6 +22,10 @@ class DataProvider extends ChangeNotifier {
   final CourierApiService _courierApiService = CourierApiService();
   final SocketService _socketService = SocketService();
 
+  // Courier live-location listeners: orderId → callback
+  final Map<String, Function(double lat, double lng, double heading)>
+  _courierLocationListeners = {};
+
   List<StoreModel> _stores = [];
   List<ProductModel> _products = [];
   List<OrderModel> _orders = [];
@@ -93,7 +97,12 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchRealStores({String? category, double? lat, double? lng, String? q}) async {
+  Future<void> fetchRealStores({
+    String? category,
+    double? lat,
+    double? lng,
+    String? q,
+  }) async {
     _isLoadingStores = true;
     notifyListeners();
 
@@ -140,7 +149,10 @@ class DataProvider extends ChangeNotifier {
       return store;
     } catch (e) {
       debugPrint('Error fetching store details from REST API: $e');
-      return _stores.firstWhere((s) => s.id == storeId, orElse: () => MockData.mockStores.first);
+      return _stores.firstWhere(
+        (s) => s.id == storeId,
+        orElse: () => MockData.mockStores.first,
+      );
     }
   }
 
@@ -168,17 +180,27 @@ class DataProvider extends ChangeNotifier {
 
           final statusStr = json['status']?.toString().toUpperCase();
           OrderStatus statusVal = OrderStatus.pending;
-          if (statusStr == 'MERCHANT_ACCEPTED') statusVal = OrderStatus.acceptedByMerchant;
-          if (statusStr == 'MERCHANT_REJECTED') statusVal = OrderStatus.rejectedByMerchant;
+          if (statusStr == 'MERCHANT_ACCEPTED')
+            statusVal = OrderStatus.acceptedByMerchant;
+          if (statusStr == 'MERCHANT_REJECTED')
+            statusVal = OrderStatus.rejectedByMerchant;
           if (statusStr == 'PREPARING') statusVal = OrderStatus.preparing;
-          if (statusStr == 'READY_FOR_PICKUP') statusVal = OrderStatus.readyForPickup;
-          if (statusStr == 'SEARCHING_COURIER') statusVal = OrderStatus.searchingCourier;
-          if (statusStr == 'COURIER_ASSIGNED' || statusStr == 'COURIER_ACCEPTED') statusVal = OrderStatus.assignedToCourier;
+          if (statusStr == 'READY_FOR_PICKUP')
+            statusVal = OrderStatus.readyForPickup;
+          if (statusStr == 'SEARCHING_COURIER')
+            statusVal = OrderStatus.searchingCourier;
+          if (statusStr == 'COURIER_ASSIGNED' ||
+              statusStr == 'COURIER_ACCEPTED')
+            statusVal = OrderStatus.assignedToCourier;
           if (statusStr == 'PICKED_UP') statusVal = OrderStatus.pickedUp;
           if (statusStr == 'ON_THE_WAY') statusVal = OrderStatus.onTheWay;
-          if (statusStr == 'ARRIVED') statusVal = OrderStatus.courierArrivedCustomer;
-          if (statusStr == 'DELIVERED' || statusStr == 'COMPLETED') statusVal = OrderStatus.delivered;
-          if (statusStr == 'CUSTOMER_CANCELLED' || statusStr == 'COURIER_CANCELLED') statusVal = OrderStatus.cancelled;
+          if (statusStr == 'ARRIVED')
+            statusVal = OrderStatus.courierArrivedCustomer;
+          if (statusStr == 'DELIVERED' || statusStr == 'COMPLETED')
+            statusVal = OrderStatus.delivered;
+          if (statusStr == 'CUSTOMER_CANCELLED' ||
+              statusStr == 'COURIER_CANCELLED')
+            statusVal = OrderStatus.cancelled;
 
           final address = AddressModel(
             id: json['id'] ?? '',
@@ -187,7 +209,8 @@ class DataProvider extends ChangeNotifier {
             street: json['deliveryAddress'] ?? '',
             landmark: '',
             latitude: (json['deliveryLatitude'] as num?)?.toDouble() ?? 15.5640,
-            longitude: (json['deliveryLongitude'] as num?)?.toDouble() ?? 32.5840,
+            longitude:
+                (json['deliveryLongitude'] as num?)?.toDouble() ?? 32.5840,
             phone: json['customer']?['phone'] ?? '0912345678',
           );
 
@@ -199,19 +222,29 @@ class DataProvider extends ChangeNotifier {
             courierId: json['courierId'],
             items: items,
             address: address,
-            customerLat: (json['deliveryLatitude'] as num?)?.toDouble() ?? 15.5640,
-            customerLng: (json['deliveryLongitude'] as num?)?.toDouble() ?? 32.5840,
-            storeLat: (json['store']?['latitude'] as num?)?.toDouble() ?? 15.5640,
-            storeLng: (json['store']?['longitude'] as num?)?.toDouble() ?? 32.5840,
+            customerLat:
+                (json['deliveryLatitude'] as num?)?.toDouble() ?? 15.5640,
+            customerLng:
+                (json['deliveryLongitude'] as num?)?.toDouble() ?? 32.5840,
+            storeLat:
+                (json['store']?['latitude'] as num?)?.toDouble() ?? 15.5640,
+            storeLng:
+                (json['store']?['longitude'] as num?)?.toDouble() ?? 32.5840,
             status: statusVal,
-            paymentMethod: json['paymentMethod'] == 'BANKAK' ? PaymentMethod.bankak : PaymentMethod.cashOnDelivery,
-            paymentStatus: json['paymentStatus'] == 'PAID' ? PaymentStatus.paid : PaymentStatus.unpaid,
+            paymentMethod: json['paymentMethod'] == 'BANKAK'
+                ? PaymentMethod.bankak
+                : PaymentMethod.cashOnDelivery,
+            paymentStatus: json['paymentStatus'] == 'PAID'
+                ? PaymentStatus.paid
+                : PaymentStatus.unpaid,
             subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
             deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 500.0,
             serviceFee: 0.0,
             discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
             total: (json['total'] as num?)?.toDouble() ?? 0.0,
-            createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
+            createdAt: json['createdAt'] != null
+                ? DateTime.parse(json['createdAt'])
+                : DateTime.now(),
           );
           parsed.add(order);
         } catch (e) {
@@ -330,15 +363,28 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateOrderStatus(String orderId, OrderStatus newStatus, String note) async {
+  /// Generic order status update — accepts either [OrderStatus] or a raw String.
+  Future<void> updateOrderStatus(
+    String orderId,
+    dynamic newStatus, [
+    String note = '',
+  ]) async {
     try {
-      if (newStatus == OrderStatus.pickedUp) {
+      final s = newStatus is OrderStatus
+          ? newStatus
+          : OrderStatus.values.firstWhere(
+              (e) =>
+                  e.name.toLowerCase() ==
+                  newStatus.toString().toLowerCase().replaceAll('_', ''),
+              orElse: () => OrderStatus.pending,
+            );
+      if (s == OrderStatus.pickedUp) {
         await _orderApiService.courierPickupOrder(orderId);
-      } else if (newStatus == OrderStatus.onTheWay) {
+      } else if (s == OrderStatus.onTheWay) {
         await _orderApiService.courierOnTheWay(orderId);
-      } else if (newStatus == OrderStatus.courierArrivedCustomer) {
+      } else if (s == OrderStatus.courierArrivedCustomer) {
         await _orderApiService.courierArrived(orderId);
-      } else if (newStatus == OrderStatus.delivered) {
+      } else if (s == OrderStatus.delivered) {
         await _orderApiService.courierDelivered(orderId);
       }
       await fetchRealOrders();
@@ -347,9 +393,32 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
-  void courierUpdateLocation(String orderId, double lat, double lng) {
+  void courierUpdateLocation(
+    String orderId,
+    double lat,
+    double lng, {
+    double heading = 0,
+  }) {
     _socketService.emitLocation(orderId, lat, lng);
-    _courierApiService.updateLocation(latitude: lat, longitude: lng, orderId: orderId);
+    _courierApiService.updateLocation(
+      latitude: lat,
+      longitude: lng,
+      orderId: orderId,
+    );
+  }
+
+  // ─── Courier location listener registry (for tracking screens) ─────────
+  void addCourierLocationListener(
+    String orderId,
+    Function(double lat, double lng, double heading) callback,
+  ) {
+    _courierLocationListeners[orderId] = callback;
+    _socketService.onCourierLocation(orderId, callback);
+  }
+
+  void removeCourierLocationListener(String orderId) {
+    _courierLocationListeners.remove(orderId);
+    _socketService.offCourierLocation(orderId);
   }
 
   List<OrderModel> getOrdersForCustomer(String customerId) {
@@ -361,10 +430,41 @@ class DataProvider extends ChangeNotifier {
   }
 
   List<OrderModel> getAvailableOrdersForCourier() {
-    return _orders.where((o) => o.status == OrderStatus.readyForPickup || o.status == OrderStatus.searchingCourier).toList();
+    return _orders
+        .where(
+          (o) =>
+              o.status == OrderStatus.readyForPickup ||
+              o.status == OrderStatus.searchingCourier,
+        )
+        .toList();
   }
 
   List<OrderModel> getOrdersForCourier(String courierId) {
-    return _orders.where((o) => o.courierId == courierId || o.courierId == null).toList();
+    return _orders
+        .where((o) => o.courierId == courierId || o.courierId == null)
+        .toList();
+  }
+
+  Future<void> rateOrder({
+    required String orderId,
+    required int rating,
+    String? comment,
+  }) async {
+    await _orderApiService.rateOrder(
+      orderId: orderId,
+      rating: rating,
+      comment: comment,
+    );
+    await fetchRealOrders();
+    await fetchRealStores();
+  }
+
+  Future<void> rateStore({
+    required String storeId,
+    required String orderId,
+    required int rating,
+    String? comment,
+  }) async {
+    await rateOrder(orderId: orderId, rating: rating, comment: comment);
   }
 }

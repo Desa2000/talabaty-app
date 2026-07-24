@@ -651,3 +651,59 @@ export const completeFirstTimeSetup = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'فشل تفعيل كلمة المرور' });
   }
 };
+
+export const otpLogin = async (req: Request, res: Response) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) {
+      return res.status(400).json({ error: 'مطلوب البريد الإلكتروني أو رقم الهاتف' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { phone: identifier },
+          { email: identifier },
+        ],
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود', exists: false });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'هذا الحساب معطل حالياً' });
+    }
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
+    const tokenHash = hashToken(refreshToken);
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: refreshExpiry,
+      },
+    });
+
+    return res.json({
+      exists: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+      },
+      accessToken,
+      refreshToken,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'حدث خطأ أثناء الدخول' });
+  }
+};
+
