@@ -1,35 +1,48 @@
 import { PrismaClient } from '@prisma/client';
+import {
+  initializeApp,
+  applicationDefault,
+  cert,
+  getApps,
+  getApp,
+  App,
+} from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 
 const prisma = new PrismaClient();
 
-// Optional firebase-admin import (safe fallback if not configured or not installed)
-let firebaseAdmin: any = null;
+// Firebase Admin App instance (v14 modular)
+let firebaseApp: App | null = null;
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const admin = require('firebase-admin');
-
-  if (admin.apps.length > 0) {
-    firebaseAdmin = admin.app();
+  if (getApps().length > 0) {
+    firebaseApp = getApp();
     console.log('[NotificationService] Using existing Firebase Admin SDK instance');
   } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    // Preferred production method: Application Default Credentials
-    firebaseAdmin = admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
+    // Preferred production method: Application Default Credentials (v14 modular)
+    firebaseApp = initializeApp({
+      credential: applicationDefault(),
     });
-    console.log('[NotificationService] Firebase Admin SDK initialized using Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS)');
+    console.log(
+      '[NotificationService] Firebase Admin SDK initialized using Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS)'
+    );
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    // Backwards compatibility fallback
+    // Backwards compatibility fallback (v14 modular)
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    firebaseAdmin = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    firebaseApp = initializeApp({
+      credential: cert(serviceAccount),
     });
-    console.log('[NotificationService] Firebase Admin SDK initialized using FIREBASE_SERVICE_ACCOUNT_JSON');
+    console.log(
+      '[NotificationService] Firebase Admin SDK initialized using FIREBASE_SERVICE_ACCOUNT_JSON'
+    );
   } else {
-    console.log('[NotificationService] Push credentials not provided (neither GOOGLE_APPLICATION_CREDENTIALS nor FIREBASE_SERVICE_ACCOUNT_JSON). Push notifications logged to console.');
+    console.log(
+      '[NotificationService] Push credentials not provided (neither GOOGLE_APPLICATION_CREDENTIALS nor FIREBASE_SERVICE_ACCOUNT_JSON). Push notifications logged to console.'
+    );
   }
 } catch (e) {
-  console.log('[NotificationService] firebase-admin package or credentials not available. Push notifications logged to console.');
+  const msg = e instanceof Error ? e.message : 'Unknown initialization error';
+  console.log(`[NotificationService] firebase-admin initialization skipped: ${msg}. Push notifications logged to console.`);
 }
 
 export interface PushNotificationPayload {
@@ -112,20 +125,21 @@ export class NotificationService {
 
       console.log(`[NotificationService] Sending push "${title}" to user ${userId} (${tokenStrings.length} tokens)`);
 
-      if (firebaseAdmin) {
+      if (firebaseApp) {
         const message = {
           notification: { title, body },
           data,
           tokens: tokenStrings,
         };
 
-        const response = await firebaseAdmin.messaging().sendEachForMulticast(message);
+        const response = await getMessaging(firebaseApp).sendEachForMulticast(message);
         console.log(`[NotificationService] FCM response: ${response.successCount} success, ${response.failureCount} failure`);
       } else {
         console.log(`[Notification] MOCK PUSH to User ${userId}: ${title} - ${body}`, data);
       }
     } catch (error) {
-      console.error('[NotificationService] Error sending push notification:', error);
+      const msg = error instanceof Error ? error.message : 'Unknown push error';
+      console.error(`[NotificationService] Error sending push notification: ${msg}`);
     }
   }
 }
