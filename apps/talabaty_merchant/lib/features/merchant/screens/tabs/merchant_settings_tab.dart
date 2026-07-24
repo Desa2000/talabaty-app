@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/data_provider.dart';
-import '../../../../core/services/firestore_service.dart';
+import '../../../../data/services/store_api_service.dart';
 import '../../../../data/models/store_model.dart';
 import '../../../../data/models/user_model.dart';
 import '../../../../core/constants/enums.dart';
@@ -73,10 +73,7 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
   Future<void> _toggleStoreStatus(String storeId, bool newValue) async {
     setState(() => _isUpdating = true);
     try {
-      await FirestoreService().updateStoreStatus(
-        storeId,
-        newValue ? 'active' : 'closed',
-      );
+      await StoreApiService().updateStoreStatus(storeId, newValue);
       setState(() => _isOpen = newValue);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -148,24 +145,12 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
         ratingCount: currentStore.ratingCount,
       );
 
-      // Save to Firestore & local cache provider
-      await FirestoreService().saveStore(updatedStore);
+      // Save store settings via backend REST API
+      await StoreApiService().updateStore(updatedStore);
 
-      // Update merchant owner profile user name if changed
-      if (_ownerNameController.text.trim() != merchantUser.name) {
-        final updatedUser = UserModel(
-          id: merchantUser.id,
-          name: _ownerNameController.text.trim(),
-          email: merchantUser.email,
-          phone: _phoneController.text.trim(),
-          password: merchantUser.password,
-          role: merchantUser.role,
-          createdAt: merchantUser.createdAt,
-          profileImage: merchantUser.profileImage,
-          fcmToken: merchantUser.fcmToken,
-          savedAddresses: merchantUser.savedAddresses,
-        );
-        await FirestoreService().saveUser(updatedUser);
+      // Refresh the local DataProvider cache
+      if (mounted) {
+        await context.read<DataProvider>().refreshCurrentStore();
       }
 
       if (mounted) {

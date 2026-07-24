@@ -106,4 +106,56 @@ class StoreApiService {
           : ApiException(message: e.message ?? 'فشلت عملية جلب تفاصيل المتجر');
     }
   }
+
+  /// Update store open/closed status via backend
+  Future<void> updateStoreStatus(String storeId, bool isOpen) async {
+    try {
+      await _apiClient.dio.patch(
+        '/stores/$storeId',
+        data: {'isOpen': isOpen},
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل تحديث حالة المتجر');
+    }
+  }
+
+  /// Update store profile fields via backend
+  Future<void> updateStore(StoreModel store) async {
+    try {
+      await _apiClient.dio.patch(
+        '/stores/${store.id}',
+        data: {
+          'name': store.name,
+          'latitude': store.latitude,
+          'longitude': store.longitude,
+          'deliveryFee': store.deliveryFee,
+          'minOrderAmount': store.minimumOrder,
+          'estimatedPrepTime': int.tryParse(store.preparationTime.replaceAll(RegExp(r'[^0-9]'), '')) ?? 20,
+          'isOpen': store.status == StoreStatus.open,
+        },
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل تحديث بيانات المتجر');
+    }
+  }
+
+  /// Upload a product image to backend and return the hosted URL
+  Future<String> uploadProductImage(String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: 'product.jpg'),
+      });
+      final response = await _apiClient.dio.post('/upload', data: formData);
+      return (response.data as Map<String, dynamic>)['url'] as String? ?? '';
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل رفع الصورة');
+    }
+  }
 }
+

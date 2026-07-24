@@ -156,6 +156,11 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
+  /// Convenience: re-fetch all stores from backend (used after store settings update)
+  Future<void> refreshCurrentStore() async {
+    await fetchRealStores();
+  }
+
   Future<void> fetchRealOrders() async {
     try {
       final rawOrders = await _orderApiService.getMyOrders();

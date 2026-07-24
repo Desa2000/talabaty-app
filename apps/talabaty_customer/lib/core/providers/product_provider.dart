@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/product_model.dart';
-import '../../data/repositories/product_repository.dart';
-import '../services/firestore_service.dart';
+import '../../data/services/store_api_service.dart';
 
+/// ProductProvider manages local product state for the Merchant dashboard.
+/// All persistence uses the backend REST API via [StoreApiService].
+/// Firestore has been fully removed.
 class ProductProvider extends ChangeNotifier {
-  final ProductRepository _repository = ProductRepository();
-  final FirestoreService _firestore = FirestoreService();
+  final StoreApiService _storeApiService = StoreApiService();
 
   List<ProductModel> _products = [];
   bool _isLoading = false;
@@ -41,15 +42,21 @@ class ProductProvider extends ChangeNotifier {
       )
       .length;
 
+  /// Set products list directly (called by DataProvider after fetching store details)
+  void setProducts(List<ProductModel> products) {
+    _products = products;
+    if (!_isDisposed) notifyListeners();
+  }
+
   Future<void> loadMerchantProducts(String storeId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final productsList = await _repository.getProductsByStoreId(storeId);
+      final result = await _storeApiService.fetchStoreDetails(storeId);
       if (_isDisposed) return;
-      _products = productsList;
+      _products = (result['products'] as List<ProductModel>?) ?? [];
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
@@ -66,10 +73,9 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _firestore.saveProduct(product);
+      // Products are saved via the Merchant's AddProductScreen which calls backend directly.
+      // Here we just update local state optimistically.
       if (_isDisposed) return;
-      // We don't strictly need to add it to _products because DataProvider streams all products,
-      // but keeping it here for the merchant dashboard local state
       _products.insert(0, product);
     } catch (e) {
       if (_isDisposed) return;
@@ -87,7 +93,6 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _firestore.saveProduct(product);
       if (_isDisposed) return;
       final index = _products.indexWhere((p) => p.id == product.id);
       if (index != -1) {
@@ -109,7 +114,7 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _firestore.deleteProduct(productId);
+      // Backend deletion is done in the screen via ProductApiService / StoreApiService.
       if (_isDisposed) return;
       _products.removeWhere((p) => p.id == productId);
     } catch (e) {
@@ -126,7 +131,7 @@ class ProductProvider extends ChangeNotifier {
   Future<void> toggleAvailability(String productId, bool isAvailable) async {
     _error = null;
     try {
-      await _repository.toggleProductAvailability(productId, isAvailable);
+      // Backend availability toggling is done via REST API in the screen.
       if (_isDisposed) return;
       final index = _products.indexWhere((p) => p.id == productId);
       if (index != -1) {
@@ -147,7 +152,7 @@ class ProductProvider extends ChangeNotifier {
       if (index != -1) {
         int newQuantity = _products[index].stockQuantity + quantityChange;
         if (newQuantity < 0) newQuantity = 0;
-        await _repository.updateStock(productId, newQuantity);
+        // Backend stock update is done via REST API in the screen.
         if (_isDisposed) return;
         _products[index] = _products[index].copyWith(
           stockQuantity: newQuantity,
@@ -170,13 +175,16 @@ class ProductProvider extends ChangeNotifier {
       bool matchesCategory = category == 'الكل' || p.category == category;
       bool matchesSearch = searchText.isEmpty || p.name.contains(searchText);
       bool matchesAvailability = true;
-      if (availability == 'متاح')
+      if (availability == 'متاح') {
         matchesAvailability = p.isAvailable && p.stockQuantity > 0;
-      if (availability == 'غير متاح')
+      }
+      if (availability == 'غير متاح') {
         matchesAvailability = !p.isAvailable || p.stockQuantity == 0;
-      if (availability == 'مخزون منخفض')
+      }
+      if (availability == 'مخزون منخفض') {
         matchesAvailability =
             p.stockQuantity > 0 && p.stockQuantity <= p.lowStockThreshold;
+      }
 
       return matchesCategory && matchesSearch && matchesAvailability;
     }).toList();

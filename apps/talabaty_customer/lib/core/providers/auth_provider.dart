@@ -3,7 +3,7 @@ import '../../data/models/user_model.dart';
 import '../../data/services/auth_api_service.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
-import '../services/firestore_service.dart';
+
 import '../constants/enums.dart';
 import '../router/app_router.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +21,6 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
 
   final AuthApiService _authApiService = AuthApiService();
-  final FirestoreService _firestoreService = FirestoreService();
 
   // EmailJS Configuration
   final String _emailJsServiceId = 'service_jsuc8aw';
@@ -342,12 +341,8 @@ class AuthProvider extends ChangeNotifier {
       savedAddresses: updatedAddresses,
     );
 
-    // Save to Firestore if firebase is active, wrap in try-catch so it never crashes
-    try {
-      await _firestoreService.saveUser(_currentUser!);
-    } catch (e) {
-      debugPrint('Error syncing user address: $e');
-    }
+    // Addresses are persisted to PostgreSQL via backend REST API (AddressApiService).
+    // No Firestore sync required.
     if (_isDisposed) return;
     notifyListeners();
   }
