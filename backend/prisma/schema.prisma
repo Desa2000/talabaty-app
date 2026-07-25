@@ -274,7 +274,12 @@ model Order {
   merchantNotes     String?
   courierNotes      String?
   bankakProofImage  String?
-  bankakTxnRef      String?
+  bankakTxnRef           String?
+  bankakLast4            String?
+  paymentSubmittedAt     DateTime?
+  paymentVerifiedAt      DateTime?
+  paymentVerifiedBy      String?
+  paymentRejectionReason String?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
