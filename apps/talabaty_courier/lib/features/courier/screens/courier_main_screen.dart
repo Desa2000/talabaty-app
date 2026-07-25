@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -31,12 +31,7 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
   ) {
     final isSelected = _currentIndex == index;
 
-    final primaryColor = HSLColor.fromAHSL(
-      1.0,
-      25.0,
-      1.0,
-      0.50,
-    ).toColor();
+    final primaryColor = HSLColor.fromAHSL(1.0, 25.0, 1.0, 0.50).toColor();
 
     return Expanded(
       child: SizedBox(
@@ -51,10 +46,7 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
           child: Center(
             child: AnimatedContainer(
               duration: 250.ms,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
                     ? primaryColor.withValues(alpha: 0.10)
@@ -67,12 +59,12 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isSelected ? activeIcon : inactiveIcon,
-                      color: isSelected
-                          ? primaryColor
-                          : Colors.grey.shade500,
-                      size: 22,
-                    )
+                          isSelected ? activeIcon : inactiveIcon,
+                          color: isSelected
+                              ? primaryColor
+                              : Colors.grey.shade500,
+                          size: 22,
+                        )
                         .animate(target: isSelected ? 1.0 : 0.0)
                         .scale(
                           begin: const Offset(1, 1),
@@ -83,27 +75,23 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
                     if (isSelected) ...[
                       const SizedBox(width: 6),
                       MediaQuery(
-                        data: MediaQuery.of(context).copyWith(
-                          textScaler: TextScaler.noScaling,
-                        ),
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.outfit(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )
+                            data: MediaQuery.of(
+                              context,
+                            ).copyWith(textScaler: TextScaler.noScaling),
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                color: primaryColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
                           .animate()
                           .fade(duration: 150.ms)
-                          .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            duration: 150.ms,
-                          ),
+                          .slideX(begin: 0.1, end: 0, duration: 150.ms),
                     ],
                   ],
                 ),
@@ -117,9 +105,7 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
-      '### COURIER MAIN SCREEN BUILD index=$_currentIndex ###',
-    );
+    debugPrint('### COURIER MAIN SCREEN BUILD index=$_currentIndex ###');
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -129,10 +115,7 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
 
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(
-          index: _currentIndex,
-          children: _tabs,
-        ),
+        child: IndexedStack(index: _currentIndex, children: _tabs),
       ),
 
       bottomNavigationBar: SafeArea(
@@ -142,17 +125,11 @@ class _CourierMainScreenState extends State<CourierMainScreen> {
           child: Container(
             // مهم جداً: يمنع الـnavigation من التمدد بطول الشاشة.
             height: 68,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 6,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: AppColors.borderGray,
-                width: 1.5,
-              ),
+              border: Border.all(color: AppColors.borderGray, width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),

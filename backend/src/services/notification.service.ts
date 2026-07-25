@@ -135,7 +135,7 @@ export class NotificationService {
         const response = await getMessaging(firebaseApp).sendEachForMulticast(message);
         console.log(`[NotificationService] FCM response: ${response.successCount} success, ${response.failureCount} failure`);
       } else {
-        console.log(`[Notification] MOCK PUSH to User ${userId}: ${title} - ${body}`, data);
+        throw new Error('FCM_NOT_CONFIGURED');
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown push error';

@@ -164,4 +164,34 @@ class OrderApiService {
           : ApiException(message: e.message ?? 'فشل تقييم الطلب');
     }
   }
+
+  Future<Map<String, dynamic>> submitBankakLast4(
+    String orderId,
+    String last4,
+  ) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/$orderId/bankak-submit',
+        data: {'last4': last4},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل إرسال رقم العملية');
+    }
+  }
+
+  Future<Map<String, dynamic>> switchToCash(String orderId) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/$orderId/switch-to-cash',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل التغيير إلى الدفع نقداً');
+    }
+  }
 }

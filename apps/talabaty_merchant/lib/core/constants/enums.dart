@@ -19,7 +19,17 @@ enum OrderStatus {
 
 enum PaymentMethod { cashOnDelivery, bankak, cashi }
 
-enum PaymentStatus { unpaid, paid, failed, pending_cash_collection, refunded }
+enum PaymentStatus {
+  unpaid,
+  paid,
+  failed,
+  pending_cash_collection,
+  refunded,
+  bankakPending,
+  bankakSubmitted,
+  bankakVerified,
+  bankakRejected,
+}
 
 enum VehicleType { motorcycle, car, electricBike, bicycle }
 
@@ -75,6 +85,13 @@ extension PaymentStatusExtension on PaymentStatus {
         return 'في انتظار التحصيل النقدي';
       case PaymentStatus.refunded:
         return 'تم الاسترجاع';
+      case PaymentStatus.bankakPending:
+      case PaymentStatus.bankakSubmitted:
+        return 'بانتظار توثيق بنكك';
+      case PaymentStatus.bankakVerified:
+        return 'تم توثيق الدفع';
+      case PaymentStatus.bankakRejected:
+        return 'تعذر توثيق الدفع';
     }
   }
 }

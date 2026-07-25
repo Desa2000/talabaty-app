@@ -120,34 +120,51 @@ export class RoutingService {
    * 1. Haversine pre-filter → top N candidates (free, no API call)
    * 2. Route Matrix (Essentials) → pick best by road duration
    */
-  static async findBestCourier(
+  static async rankCouriers(
     candidates: Array<{ courierId: string; lat: number; lng: number }>,
     merchantLat: number,
     merchantLng: number,
     maxCandidates = 5
-  ): Promise<string | null> {
-    if (candidates.length === 0) return null;
+  ): Promise<
+    Array<{
+      courierId: string;
+      distanceMeters: number;
+      durationSeconds: number;
+    }>
+  > {
+    if (candidates.length === 0) return [];
 
-    // Step 1: Haversine shortlist (free)
+    // Free pre-filter before using Google Route Matrix.
     const ranked = candidates
-      .map((c) => ({
-        ...c,
+      .map((candidate) => ({
+        ...candidate,
         distKm: this.haversineDistance(
-          { latitude: c.lat, longitude: c.lng },
-          { latitude: merchantLat, longitude: merchantLng }
+          {
+            latitude: candidate.lat,
+            longitude: candidate.lng,
+          },
+          {
+            latitude: merchantLat,
+            longitude: merchantLng,
+          }
         ),
       }))
       .sort((a, b) => a.distKm - b.distKm)
-      .slice(0, maxCandidates);
+      .slice(0, Math.max(1, maxCandidates));
 
-    if (ranked.length === 0) return null;
+    if (ranked.length === 0) return [];
 
-    // Step 2: Route Matrix on shortlist only (if Google is configured)
+    // Safe fallback ranking if Google is unavailable.
+    const fallbackRanking = ranked.map((candidate) => ({
+      courierId: candidate.courierId,
+      distanceMeters: Math.round(candidate.distKm * 1000),
+      durationSeconds: Math.round((candidate.distKm / 28) * 3600),
+    }));
+
     if (this.isGoogleConfigured() && ranked.length > 1) {
       try {
-        const elementCount = ranked.length; // N origins × 1 destination
         routingStats.routeMatrixCalls++;
-        routingStats.routeMatrixElementsTotal += elementCount;
+        routingStats.routeMatrixElementsTotal += ranked.length;
 
         const response = await fetch(
           'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
@@ -156,17 +173,30 @@ export class RoutingService {
             headers: {
               'Content-Type': 'application/json',
               'X-Goog-Api-Key': this.googleApiKey,
-              'X-Goog-FieldMask': 'originIndex,distanceMeters,duration,status',
+              'X-Goog-FieldMask':
+                'originIndex,distanceMeters,duration,status',
             },
             body: JSON.stringify({
-              origins: ranked.map((c, i) => ({
-                waypoint: { location: { latLng: { latitude: c.lat, longitude: c.lng } } },
+              origins: ranked.map((candidate) => ({
+                waypoint: {
+                  location: {
+                    latLng: {
+                      latitude: candidate.lat,
+                      longitude: candidate.lng,
+                    },
+                  },
+                },
                 routeModifiers: {},
               })),
               destinations: [
                 {
                   waypoint: {
-                    location: { latLng: { latitude: merchantLat, longitude: merchantLng } },
+                    location: {
+                      latLng: {
+                        latitude: merchantLat,
+                        longitude: merchantLng,
+                      },
+                    },
                   },
                 },
               ],
@@ -178,28 +208,86 @@ export class RoutingService {
 
         if (response.ok) {
           const matrix: any[] = (await response.json()) as any[];
-          let bestIdx = 0;
-          let bestDuration = Infinity;
-          for (const entry of matrix) {
-            if (entry.status?.code === 0 || !entry.status) {
-              const dur = parseInt((entry.duration || '99999s').replace('s', ''), 10);
-              if (dur < bestDuration) {
-                bestDuration = dur;
-                bestIdx = entry.originIndex ?? 0;
-              }
+
+          const routeResults = new Map<
+            number,
+            {
+              distanceMeters: number;
+              durationSeconds: number;
             }
+          >();
+
+          for (const entry of matrix) {
+            if (
+              entry.originIndex == null ||
+              (entry.status?.code !== 0 && entry.status)
+            ) {
+              continue;
+            }
+
+            const durationSeconds =
+              parseInt(
+                String(entry.duration ?? '0s').replace('s', ''),
+                10
+              ) || 0;
+
+            const distanceMeters =
+              Number(entry.distanceMeters) || 0;
+
+            routeResults.set(entry.originIndex, {
+              distanceMeters,
+              durationSeconds,
+            });
           }
-          return ranked[bestIdx]?.courierId ?? ranked[0].courierId;
+
+          return fallbackRanking
+            .map((fallback, index) => {
+              const route = routeResults.get(index);
+
+              if (!route) return fallback;
+
+              return {
+                courierId: fallback.courierId,
+                distanceMeters:
+                  route.distanceMeters || fallback.distanceMeters,
+                durationSeconds:
+                  route.durationSeconds || fallback.durationSeconds,
+              };
+            })
+            .sort((a, b) => {
+              if (a.durationSeconds !== b.durationSeconds) {
+                return a.durationSeconds - b.durationSeconds;
+              }
+
+              return a.distanceMeters - b.distanceMeters;
+            });
         }
-      } catch (e) {
-        console.warn('[RoutingService] Route Matrix failed, using Haversine winner');
+      } catch (error) {
+        console.warn(
+          '[RoutingService] Route Matrix ranking failed, using Haversine ranking:',
+          (error as Error).message
+        );
       }
     }
 
-    // Fallback: closest by Haversine
-    return ranked[0].courierId;
+    return fallbackRanking;
   }
 
+  static async findBestCourier(
+    candidates: Array<{ courierId: string; lat: number; lng: number }>,
+    merchantLat: number,
+    merchantLng: number,
+    maxCandidates = 5
+  ): Promise<string | null> {
+    const ranked = await this.rankCouriers(
+      candidates,
+      merchantLat,
+      merchantLng,
+      maxCandidates
+    );
+
+    return ranked[0]?.courierId ?? null;
+  }
   // ─── Helpers ────────────────────────────────────────────────────────────────
   static isGoogleConfigured(): boolean {
     return (

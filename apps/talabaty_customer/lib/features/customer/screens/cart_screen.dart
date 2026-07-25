@@ -174,30 +174,23 @@ class _CartScreenState extends State<CartScreen> {
       orElse: () => dataProvider.stores.first,
     );
 
-    // Calculate dynamic delivery fee
-    double distance = 0.0;
-    double deliveryFee = 3000.0; // fallback default delivery fee
-
+    // Never fabricate customer coordinates when GPS is unavailable.
+    double? deliveryDistanceKm;
+    double deliveryFee = store.deliveryFee > 0 ? store.deliveryFee : 0;
     if (_userLat != null && _userLng != null) {
-      distance = DeliveryFeeService.distanceKm(
+      deliveryDistanceKm = DeliveryFeeService.distanceKm(
         _userLat!,
         _userLng!,
         store.latitude,
         store.longitude,
       );
-      deliveryFee = DeliveryFeeService.deliveryFee(distance);
-    } else {
-      // default location of store (if gps fails)
-      distance = DeliveryFeeService.distanceKm(
-        15.5006,
-        32.5599,
-        store.latitude,
-        store.longitude,
-      );
-      deliveryFee = DeliveryFeeService.deliveryFee(distance);
+      deliveryFee = store.deliveryFee > 0
+          ? store.deliveryFee
+          : DeliveryFeeService.deliveryFee(deliveryDistanceKm);
     }
 
-    final double serviceFee = DeliveryFeeService.serviceFee(cart.totalPrice);
+    // The authoritative application fee is calculated by the backend.
+    const double serviceFee = 0;
     final double total = DeliveryFeeService.orderTotal(
       subtotal: cart.totalPrice,
       deliveryFee: deliveryFee,
@@ -448,7 +441,7 @@ class _CartScreenState extends State<CartScreen> {
                         ],
                       ),
                     )
-                  else if (_userLat != null)
+                  else if (deliveryDistanceKm != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
@@ -460,7 +453,7 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'مسافة التوصيل: ${distance.toStringAsFixed(1)} كم من ${store.name}',
+                            'مسافة التوصيل: ${deliveryDistanceKm.toStringAsFixed(1)} كم من ${store.name}',
                             style: GoogleFonts.cairo(
                               fontSize: 12,
                               color: Colors.grey[700],

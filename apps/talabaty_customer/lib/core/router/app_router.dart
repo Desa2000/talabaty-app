@@ -23,6 +23,8 @@ import '../../features/customer/screens/favorites_screen.dart';
 import '../../features/customer/screens/payment_methods_screen.dart';
 import '../../features/customer/screens/settings_screen.dart';
 import '../../features/customer/screens/rate_order_screen.dart';
+import '../../features/customer/screens/profile_screen.dart';
+import '../../features/customer/screens/my_orders_screen.dart';
 
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -89,7 +91,19 @@ class AppRouter {
         builder: (context, state) => const CustomerMainScreen(),
       ),
       GoRoute(
+        path: '/customer/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/customer/orders',
+        builder: (context, state) => const MyOrdersScreen(),
+      ),
+      GoRoute(
         path: '/customer/address',
+        builder: (context, state) => const AddressScreen(),
+      ),
+      GoRoute(
+        path: '/customer/addresses',
         builder: (context, state) => const AddressScreen(),
       ),
       GoRoute(
@@ -106,6 +120,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/add-address',
+        builder: (context, state) => const AddAddressScreen(),
+      ),
+      GoRoute(
+        path: '/customer/add-address',
         builder: (context, state) => const AddAddressScreen(),
       ),
       GoRoute(

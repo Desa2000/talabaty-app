@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../network/api_endpoints.dart';
+import '../network/api_client.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -19,29 +20,63 @@ class SocketService {
     return base;
   }
 
-  void connect() {
-    if (_socket != null && _socket!.connected) return;
+  Future<void> connect() async {
+    if (_socket != null && _socket!.connected) {
+      return;
+    }
 
-    _socket = io.io(_socketUrl, <String, dynamic>{
-      'transports': ['websocket', 'polling'],
-      'autoConnect': false,
-    });
+    final token = await ApiClient().getAccessToken();
 
-    _socket!.connect();
+    if (token == null || token.trim().isEmpty) {
+      debugPrint(
+        '[SocketService] No access token available. Socket connection skipped.',
+      );
+      return;
+    }
+
+    // Dispose any stale socket instance so a refreshed JWT
+    // is never mixed with an old Socket.IO manager.
+    _socket?.disconnect();
+    _socket?.dispose();
+
+    _socket = io.io(
+      _socketUrl,
+      <String, dynamic>{
+        'transports': ['websocket', 'polling'],
+        'autoConnect': false,
+        'forceNew': true,
+        'auth': {
+          'token': token,
+        },
+      },
+    );
 
     _socket!.onConnect((_) {
-      debugPrint('✅ Connected to Socket.IO Server at $_socketUrl');
+      debugPrint(
+        '✅ Authenticated Socket.IO connection established',
+      );
     });
 
-    _socket!.onDisconnect((_) {
-      debugPrint('❌ Disconnected from Socket.IO Server');
+    _socket!.onDisconnect((reason) {
+      debugPrint(
+        '❌ Socket.IO disconnected: $reason',
+      );
+    });
+
+    _socket!.onConnectError((error) {
+      debugPrint(
+        '⚠️ Socket authentication/connection error: $error',
+      );
     });
 
     _socket!.onError((error) {
-      debugPrint('⚠️ Socket Error: $error');
+      debugPrint(
+        '⚠️ Socket.IO error: $error',
+      );
     });
-  }
 
+    _socket!.connect();
+  }
   void disconnect() {
     _socket?.disconnect();
     _socket = null;

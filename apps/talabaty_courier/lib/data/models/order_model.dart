@@ -43,6 +43,30 @@ class OrderModel {
   final DateTime createdAt;
   DateTime? deliveredAt;
 
+  final String? dispatchOfferId;
+  final int? offerRank;
+  final DateTime? offerExpiresAt;
+  final bool isTargetedOffer;
+
+  bool get hasLiveDispatchOffer {
+    if (!isTargetedOffer ||
+        dispatchOfferId == null ||
+        offerExpiresAt == null) {
+      return false;
+    }
+
+    return offerExpiresAt!.isAfter(DateTime.now());
+  }
+
+  int get offerSecondsRemaining {
+    if (offerExpiresAt == null) return 0;
+
+    final seconds =
+        offerExpiresAt!.difference(DateTime.now()).inSeconds;
+
+    return seconds > 0 ? seconds : 0;
+  }
+
   double get totalAmount => total;
 
   OrderModel({
@@ -71,6 +95,10 @@ class OrderModel {
     required this.total,
     required this.createdAt,
     this.deliveredAt,
+    this.dispatchOfferId,
+    this.offerRank,
+    this.offerExpiresAt,
+    this.isTargetedOffer = false,
   }) : statusHistory =
            statusHistory ??
            [

@@ -59,21 +59,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Development-only: auto-login as test customer
-  void devAutoLogin() {
-    _currentUser = UserModel(
-      id: 'cu1',
-      name: 'عمر صديق',
-      phone: '0912345678',
-      email: 'omar@talabaty.com',
-      password: '123',
-      role: UserRole.customer,
-      createdAt: DateTime.now(),
-    );
-    _isLoading = false;
-    notifyListeners();
-    debugPrint('DEV: Auto-logged in as customer عمر صديق');
-  }
 
   Future<void> checkAuthStatus() async {
     _isLoading = true;
@@ -121,13 +106,12 @@ class AuthProvider extends ChangeNotifier {
       _generatedOtp = (100000 + random.nextInt(900000)).toString();
       _pendingEmail = email;
 
-      debugPrint('==== EMAIL OTP GENERATED: $_generatedOtp ====');
-
       if (_emailJsServiceId == 'YOUR_SERVICE_ID' || _emailJsServiceId.isEmpty) {
-        debugPrint('EmailJS keys not configured. OTP printed in console only.');
+        _generatedOtp = null;
+        _pendingEmail = null;
         _isLoading = false;
         notifyListeners();
-        onCodeSent();
+        onError('خدمة رمز التحقق غير مهيأة حالياً');
         return;
       }
 
@@ -154,12 +138,11 @@ class AuthProvider extends ChangeNotifier {
         }
       } catch (e) {
         if (_isDisposed) return;
-        debugPrint(
-          'EmailJS sending failed ($e). Proceeding in offline testing mode.',
-        );
+        _generatedOtp = null;
+        _pendingEmail = null;
         _isLoading = false;
         notifyListeners();
-        onCodeSent();
+        onError('تعذر إرسال رمز التحقق، حاول لاحقاً');
       }
     } catch (e) {
       if (_isDisposed) return;
@@ -183,11 +166,7 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Verify OTP (allow master test codes 1234, 123456, 123457 for testing)
-    if (otp != _generatedOtp &&
-        otp != '1234' &&
-        otp != '123456' &&
-        otp != '123457') {
+    if (otp != _generatedOtp) {
       _isLoading = false;
       notifyListeners();
       onError('رمز التحقق غير صحيح');
@@ -308,7 +287,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      try { await NotificationService().unregisterFCMToken(); } catch (_) {}
+      try {
+        await NotificationService().unregisterFCMToken();
+      } catch (_) {}
       await _authApiService.logout();
     } catch (e) {
       debugPrint('Error during backend logout: $e');

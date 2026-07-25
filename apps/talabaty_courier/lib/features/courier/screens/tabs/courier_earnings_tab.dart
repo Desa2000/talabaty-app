@@ -52,9 +52,9 @@ class _CourierEarningsTabState extends State<CourierEarningsTab> {
 
     final List<OrderModel> completedOrders = courierId.isNotEmpty
         ? dataProvider
-            .getOrdersForCourier(courierId)
-            .where((o) => o.status == OrderStatus.delivered)
-            .toList()
+              .getOrdersForCourier(courierId)
+              .where((o) => o.status == OrderStatus.delivered)
+              .toList()
         : <OrderModel>[];
     completedOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 

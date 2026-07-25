@@ -9,7 +9,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "admin:reset-password": "ts-node src/scripts/reset_superadmin_password.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

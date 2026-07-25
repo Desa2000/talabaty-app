@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,7 @@ class CourierJobsTab extends StatefulWidget {
 
 class _CourierJobsTabState extends State<CourierJobsTab> {
   final Set<String> _rejectedOrders = {};
+  Timer? _offerCountdownTimer;
   GoogleMapController? _mapController;
   bool _isOnline = false;
   String? _selectedOrderId;
@@ -31,6 +34,15 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
   void initState() {
     super.initState();
     _determinePosition();
+
+    // Refresh the visible countdown once per second.
+    // The server remains authoritative for whether the offer is valid.
+    _offerCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<DataProvider>().fetchRealOrders();
@@ -40,6 +52,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
 
   @override
   void dispose() {
+    _offerCountdownTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
@@ -125,6 +138,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('### REAL COURIER JOBS TAB BUILD ###');
     final auth = context.watch<AuthProvider>();
     final dataProvider = context.watch<DataProvider>();
 
@@ -306,9 +320,7 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
               const SizedBox(height: 8),
               Text(
                 'تأكد من الاتصال بالشبكة وحاول مرة أخرى',
-                style: GoogleFonts.cairo(
-                  color: AppColors.textSecondary,
-                ),
+                style: GoogleFonts.cairo(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -835,6 +847,51 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: order.offerSecondsRemaining <= 5
+                    ? Colors.red.withValues(alpha: 0.08)
+                    : AppColors.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 20,
+                    color: order.offerSecondsRemaining <= 5
+                        ? Colors.red
+                        : AppColors.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ينتهي عرض التوصيل خلال',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${order.offerSecondsRemaining} ث',
+                    style: GoogleFonts.cairo(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: order.offerSecondsRemaining <= 5
+                          ? Colors.red
+                          : AppColors.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 16),
             Row(
               children: [
@@ -847,13 +904,48 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _rejectedOrders.add(order.id);
-                        if (_selectedOrderId == order.id) {
-                          _selectedOrderId = null;
-                        }
-                      });
+                    onPressed: () async {
+                      try {
+                        await dataProvider.courierRejectOffer(order.id);
+
+                        if (!context.mounted) return;
+
+                        setState(() {
+                          _rejectedOrders.add(order.id);
+
+                          if (_selectedOrderId == order.id) {
+                            _selectedOrderId = null;
+                          }
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'تم تجاهل العرض وسيتم إرساله للمندوب التالي',
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        await dataProvider.fetchRealOrders();
+
+                        if (!context.mounted) return;
+
+                        final message = e
+                            .toString()
+                            .replaceAll('Exception:', '')
+                            .trim();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              message.isEmpty
+                                  ? 'تعذر تجاهل عرض التوصيل'
+                                  : message,
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     },
                     child: Text(
                       'تجاهل',
@@ -888,10 +980,46 @@ class _CourierJobsTabState extends State<CourierJobsTab> {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('تعذر قبول الطلب: $e'),
-                              backgroundColor: Colors.red,
+                          final msg = e
+                              .toString()
+                              .replaceAll('Exception:', '')
+                              .trim();
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: Text(
+                                'تنبيه',
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: Text(
+                                msg.contains('آخر')
+                                    ? 'تم قبول الطلب بواسطة مندوب آخر'
+                                    : msg,
+                                style: GoogleFonts.cairo(),
+                              ),
+                              actions: [
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryColor,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    dataProvider.fetchRealOrders();
+                                  },
+                                  child: Text(
+                                    'حسناً',
+                                    style: GoogleFonts.cairo(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         }

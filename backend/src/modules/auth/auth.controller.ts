@@ -47,8 +47,8 @@ const registerMerchantSchema = z.object({
   storeName: z.string().min(2),
   storeCategory: z.enum(['RESTAURANT', 'SUPERMARKET', 'PHARMACY']),
   storeAddress: z.string().optional(),
-  latitude: z.number().optional().default(15.5007),
-  longitude: z.number().optional().default(32.5599),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
 });
 
 const registerCourierSchema = z.object({

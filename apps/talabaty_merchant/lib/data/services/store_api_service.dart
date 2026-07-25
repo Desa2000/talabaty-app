@@ -110,10 +110,7 @@ class StoreApiService {
   /// Update store open/closed status via backend
   Future<void> updateStoreStatus(String storeId, bool isOpen) async {
     try {
-      await _apiClient.dio.patch(
-        '/stores/$storeId',
-        data: {'isOpen': isOpen},
-      );
+      await _apiClient.dio.patch('/stores/$storeId', data: {'isOpen': isOpen});
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException
@@ -132,7 +129,11 @@ class StoreApiService {
           'longitude': store.longitude,
           'deliveryFee': store.deliveryFee,
           'minOrderAmount': store.minimumOrder,
-          'estimatedPrepTime': int.tryParse(store.preparationTime.replaceAll(RegExp(r'[^0-9]'), '')) ?? 20,
+          'estimatedPrepTime':
+              int.tryParse(
+                store.preparationTime.replaceAll(RegExp(r'[^0-9]'), ''),
+              ) ??
+              20,
           'isOpen': store.status == StoreStatus.open,
         },
       );
@@ -158,4 +159,3 @@ class StoreApiService {
     }
   }
 }
-

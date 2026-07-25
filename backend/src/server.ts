@@ -36,12 +36,15 @@ import {
   merchantPreparing,
   merchantReadyForPickup,
   courierAcceptOrder,
+  courierRejectOffer,
   courierPickupOrder,
   courierOnTheWay,
   courierArrived,
   courierDelivered,
   customerCancelOrder,
   rateOrder,
+  submitBankakPayment,
+  switchToCashPayment,
 } from './modules/orders/order.controller';
 import {
   getAddresses,
@@ -66,6 +69,8 @@ import {
   getAdminMerchants,
   updateMerchantStatus,
   getAdminCouriers,
+  getAdminLiveMap,
+  getAdminLiveRoute,
   updateCourierStatus as adminUpdateCourierStatus,
   getAdminCustomers,
   updateCustomerStatus,
@@ -81,7 +86,10 @@ import {
   getAdminUsers,
   createAdminUser,
 } from './modules/admin/admin.controller';
-import { authenticate, authorizeRoles } from './middleware/auth.middleware';
+import jwt from 'jsonwebtoken';
+import { prisma } from './utils/prisma';
+import { authenticate, authorizeRoles, isAdminRole } from './middleware/auth.middleware';
+import { startDispatchWorker } from './workers/dispatch.worker';
 
 // IP Rate Limiting for Login Protection
 const loginIpAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -106,14 +114,45 @@ const loginRateLimiter = (req: express.Request, res: express.Response, next: exp
   return next();
 };
 
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://mytalabaty.com,https://www.mytalabaty.com')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOrigin = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+  if (!origin || allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+  return callback(new Error('CORS origin not allowed'));
+};
+
+const apiRateBuckets = new Map<string, { count: number; resetTime: number }>();
+const apiRateLimiter = (limit: number, windowMs: number) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = `${req.ip || req.socket.remoteAddress || 'unknown'}:${req.path}`;
+    const now = Date.now();
+    const bucket = apiRateBuckets.get(key);
+    if (!bucket || now > bucket.resetTime) {
+      apiRateBuckets.set(key, { count: 1, resetTime: now + windowMs });
+      return next();
+    }
+    if (bucket.count >= limit) {
+      return res.status(429).json({ error: 'تم تجاوز الحد المسموح من الطلبات، حاول لاحقاً' });
+    }
+    bucket.count += 1;
+    return next();
+  };
+
 const app = express();
 export const server = http.createServer(app);
 
 // CORS Configuration
 app.use(
   cors({
-    origin: '*',
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
@@ -162,8 +201,8 @@ app.delete('/api/merchant/products/:id', authenticate, authorizeRoles('MERCHANT'
 
 // 4. Cart & Routing Routes
 app.post('/api/cart/validate', validateCart);
-app.post('/api/routing/route', computeRouteHandler);
-app.post('/api/routing/delivery-fee', calculateDeliveryFeeHandler);
+app.post('/api/routing/route', authenticate, apiRateLimiter(60, 60_000), computeRouteHandler);
+app.post('/api/routing/delivery-fee', authenticate, apiRateLimiter(30, 60_000), calculateDeliveryFeeHandler);
 
 // 5. Order Routes
 app.post('/api/orders', authenticate, createOrder);
@@ -177,14 +216,17 @@ app.post('/api/orders/:id/preparing', authenticate, authorizeRoles('MERCHANT', '
 app.post('/api/orders/:id/ready', authenticate, authorizeRoles('MERCHANT', 'ADMIN', 'SUPER_ADMIN'), merchantReadyForPickup);
 
 // Courier Order Flow
-app.post('/api/orders/:id/courier/accept', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierAcceptOrder);
-app.post('/api/orders/:id/picked-up', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierPickupOrder);
-app.post('/api/orders/:id/on-the-way', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierOnTheWay);
-app.post('/api/orders/:id/arrived', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierArrived);
-app.post('/api/orders/:id/delivered', authenticate, authorizeRoles('COURIER', 'ADMIN', 'SUPER_ADMIN'), courierDelivered);
-app.post('/api/orders/:id/completed', authenticate, courierDelivered);
+app.post('/api/orders/:id/courier/accept', authenticate, authorizeRoles('COURIER'), courierAcceptOrder);
+app.post('/api/orders/:id/courier/reject', authenticate, authorizeRoles('COURIER'), courierRejectOffer);
+app.post('/api/orders/:id/picked-up', authenticate, authorizeRoles('COURIER'), courierPickupOrder);
+app.post('/api/orders/:id/on-the-way', authenticate, authorizeRoles('COURIER'), courierOnTheWay);
+app.post('/api/orders/:id/arrived', authenticate, authorizeRoles('COURIER'), courierArrived);
+app.post('/api/orders/:id/delivered', authenticate, authorizeRoles('COURIER'), courierDelivered);
+app.post('/api/orders/:id/completed', authenticate, authorizeRoles('COURIER'), courierDelivered);
 app.post('/api/orders/:id/cancel', authenticate, customerCancelOrder);
 app.post('/api/orders/:id/rate', authenticate, rateOrder);
+app.post('/api/orders/:id/bankak-submit', authenticate, submitBankakPayment);
+app.post('/api/orders/:id/switch-to-cash', authenticate, switchToCashPayment);
 
 // 6. Address Routes
 app.get('/api/addresses', authenticate, getAddresses);
@@ -223,6 +265,8 @@ app.get('/api/admin/merchants', authenticate, authorizeRoles(...adminRoles), get
 app.post('/api/admin/merchants/:id/status', authenticate, authorizeRoles(...opsRoles), updateMerchantStatus);
 
 app.get('/api/admin/couriers', authenticate, authorizeRoles(...adminRoles), getAdminCouriers);
+app.get('/api/admin/live-map', authenticate, authorizeRoles(...opsRoles), getAdminLiveMap);
+app.get('/api/admin/live-map/:courierId/route', authenticate, authorizeRoles(...opsRoles), getAdminLiveRoute);
 app.post('/api/admin/couriers/:id/status', authenticate, authorizeRoles(...opsRoles), adminUpdateCourierStatus);
 
 app.get('/api/admin/customers', authenticate, authorizeRoles(...adminRoles), getAdminCustomers);
@@ -247,51 +291,509 @@ app.post('/api/admin/users', authenticate, authorizeRoles(...superAdminOnly), cr
 // Socket.io Real-Time System
 export const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
 
-io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`);
+type SocketUser = {
+  id: string;
+  role: string;
+  email: string | null;
+  phone: string;
+  tokenVersion: number;
+};
 
-  socket.on('joinOrderRoom', (orderId: string) => {
-    socket.join(`order_${orderId}`);
-    console.log(`📦 Client ${socket.id} joined tracking room: order_${orderId}`);
-  });
+type SocketAck = (response: {
+  ok: boolean;
+  error?: string;
+}) => void;
 
-  socket.on('joinUserRoom', (userId: string) => {
-    socket.join(`user_${userId}`);
-    console.log(`👤 Client ${socket.id} joined user room: user_${userId}`);
-  });
+// Authenticate every socket connection with the same
+// access JWT and tokenVersion rules used by the REST API.
+io.use(async (socket, next) => {
+  try {
+    const handshakeToken = socket.handshake.auth?.token;
+    const authorizationHeader =
+      socket.handshake.headers.authorization;
 
-  socket.on('joinStoreRoom', (storeId: string) => {
-    socket.join(`store_${storeId}`);
-    console.log(`🏪 Merchant ${socket.id} joined store room: store_${storeId}`);
-  });
+    let token: string | null = null;
 
-  socket.on('joinCourierChannel', () => {
-    socket.join('couriers_available');
-    console.log(`🛵 Courier ${socket.id} joined available couriers room`);
-  });
+    if (
+      typeof handshakeToken === 'string' &&
+      handshakeToken.trim()
+    ) {
+      token = handshakeToken.trim();
 
-  socket.on('joinAdminRoom', (adminToken: string) => {
-    // Basic verification check for admin room joining
-    socket.join('admins');
-    console.log(`🛡️ Admin ${socket.id} joined secure admin room`);
-  });
+      if (token.startsWith('Bearer ')) {
+        token = token.slice(7).trim();
+      }
+    } else if (
+      typeof authorizationHeader === 'string' &&
+      authorizationHeader.startsWith('Bearer ')
+    ) {
+      token = authorizationHeader
+        .slice(7)
+        .trim();
+    }
 
-  socket.on('updateLocation', (data: { orderId: string; lat: number; lng: number; heading?: number }) => {
-    const { orderId, lat, lng, heading } = data;
-    io.to(`order_${orderId}`).emit('courier.location_updated', { orderId, latitude: lat, longitude: lng, heading: heading || 0.0 });
-    io.to('admins').emit('courier.location_updated', { orderId, latitude: lat, longitude: lng, heading: heading || 0.0 });
-  });
+    if (!token) {
+      return next(
+        new Error('SOCKET_UNAUTHORIZED')
+      );
+    }
 
-  socket.on('disconnect', () => {
-    console.log(`❌ Client disconnected: ${socket.id}`);
-  });
+    const decoded = jwt.verify(
+      token,
+      config.jwtAccessSecret
+    ) as {
+      sub: string;
+      role: string;
+      email: string | null;
+      phone: string;
+      tokenVersion?: number;
+    };
+
+    if (
+      !decoded.sub ||
+      typeof decoded.sub !== 'string'
+    ) {
+      return next(
+        new Error('SOCKET_UNAUTHORIZED')
+      );
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: {
+        id: decoded.sub,
+      },
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        tokenVersion: true,
+      },
+    });
+
+    if (!dbUser || !dbUser.isActive) {
+      return next(
+        new Error('SOCKET_UNAUTHORIZED')
+      );
+    }
+
+    if (
+      decoded.tokenVersion !== undefined &&
+      decoded.tokenVersion !== dbUser.tokenVersion
+    ) {
+      return next(
+        new Error('SOCKET_SESSION_REVOKED')
+      );
+    }
+
+    const socketUser: SocketUser = {
+      id: dbUser.id,
+      role: dbUser.role,
+      email: dbUser.email,
+      phone: dbUser.phone,
+      tokenVersion: dbUser.tokenVersion,
+    };
+
+    socket.data.user = socketUser;
+
+    return next();
+  } catch (error) {
+    console.warn(
+      '[Socket Auth] Connection rejected'
+    );
+
+    return next(
+      new Error('SOCKET_UNAUTHORIZED')
+    );
+  }
 });
 
+io.on('connection', (socket) => {
+  const user = socket.data.user as SocketUser;
+
+  console.log(
+    `[Socket] Authenticated connection: ${socket.id}`
+  );
+
+  // Every authenticated connection automatically joins
+  // only its own private user room.
+  socket.join(`user_${user.id}`);
+
+  // Admin room membership comes from the authenticated DB role.
+  if (isAdminRole(user.role)) {
+    socket.join('admins');
+  }
+
+  if (
+    user.role === 'SUPER_ADMIN' ||
+    user.role === 'ADMIN' ||
+    user.role === 'OPERATIONS'
+  ) {
+    socket.join('operations_admins');
+  }
+
+  // Kept for existing clients, but a client can only request
+  // its own authenticated user room.
+  socket.on(
+    'joinUserRoom',
+    (
+      requestedUserId: string,
+      ack?: SocketAck
+    ) => {
+      if (requestedUserId !== user.id) {
+        ack?.({
+          ok: false,
+          error: 'FORBIDDEN',
+        });
+        return;
+      }
+
+      socket.join(`user_${user.id}`);
+
+      ack?.({
+        ok: true,
+      });
+    }
+  );
+
+  socket.on(
+    'joinOrderRoom',
+    async (
+      orderId: string,
+      ack?: SocketAck
+    ) => {
+      try {
+        if (
+          typeof orderId !== 'string' ||
+          !orderId.trim()
+        ) {
+          ack?.({
+            ok: false,
+            error: 'INVALID_ORDER',
+          });
+          return;
+        }
+
+        const order = await prisma.order.findUnique({
+          where: {
+            id: orderId,
+          },
+          select: {
+            customerId: true,
+            courierId: true,
+            store: {
+              select: {
+                merchant: {
+                  select: {
+                    userId: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!order) {
+          ack?.({
+            ok: false,
+            error: 'FORBIDDEN',
+          });
+          return;
+        }
+
+        const allowed =
+          isAdminRole(user.role) ||
+          order.customerId === user.id ||
+          order.courierId === user.id ||
+          order.store.merchant.userId === user.id;
+
+        if (!allowed) {
+          ack?.({
+            ok: false,
+            error: 'FORBIDDEN',
+          });
+          return;
+        }
+
+        socket.join(`order_${orderId}`);
+
+        ack?.({
+          ok: true,
+        });
+      } catch (error) {
+        console.error(
+          '[Socket] joinOrderRoom failed:',
+          error
+        );
+
+        ack?.({
+          ok: false,
+          error: 'SERVER_ERROR',
+        });
+      }
+    }
+  );
+
+  socket.on(
+    'joinStoreRoom',
+    async (
+      storeId: string,
+      ack?: SocketAck
+    ) => {
+      try {
+        if (
+          typeof storeId !== 'string' ||
+          !storeId.trim()
+        ) {
+          ack?.({
+            ok: false,
+            error: 'INVALID_STORE',
+          });
+          return;
+        }
+
+        const store = await prisma.store.findUnique({
+          where: {
+            id: storeId,
+          },
+          select: {
+            merchant: {
+              select: {
+                userId: true,
+              },
+            },
+          },
+        });
+
+        const allowed =
+          !!store &&
+          (
+            isAdminRole(user.role) ||
+            store.merchant.userId === user.id
+          );
+
+        if (!allowed) {
+          ack?.({
+            ok: false,
+            error: 'FORBIDDEN',
+          });
+          return;
+        }
+
+        socket.join(`store_${storeId}`);
+
+        ack?.({
+          ok: true,
+        });
+      } catch (error) {
+        console.error(
+          '[Socket] joinStoreRoom failed:',
+          error
+        );
+
+        ack?.({
+          ok: false,
+          error: 'SERVER_ERROR',
+        });
+      }
+    }
+  );
+
+  // This legacy room is no longer used for broad order
+  // broadcasting, but access remains restricted for compatibility.
+  socket.on(
+    'joinCourierChannel',
+    async (ack?: SocketAck) => {
+      try {
+        if (user.role !== 'COURIER') {
+          ack?.({
+            ok: false,
+            error: 'FORBIDDEN',
+          });
+          return;
+        }
+
+        const courier =
+          await prisma.courierProfile.findUnique({
+            where: {
+              userId: user.id,
+            },
+            select: {
+              verificationStatus: true,
+              status: true,
+              isOnline: true,
+            },
+          });
+
+        if (
+          !courier ||
+          courier.verificationStatus !== 'APPROVED' ||
+          courier.status !== 'AVAILABLE' ||
+          !courier.isOnline
+        ) {
+          ack?.({
+            ok: false,
+            error: 'COURIER_NOT_AVAILABLE',
+          });
+          return;
+        }
+
+        socket.join('couriers_available');
+
+        ack?.({
+          ok: true,
+        });
+      } catch (error) {
+        console.error(
+          '[Socket] joinCourierChannel failed:',
+          error
+        );
+
+        ack?.({
+          ok: false,
+          error: 'SERVER_ERROR',
+        });
+      }
+    }
+  );
+
+  // Kept for compatibility. The supplied token is intentionally
+  // ignored because admin authorization came from the handshake JWT.
+  socket.on(
+    'joinAdminRoom',
+    (
+      _legacyAdminToken?: string,
+      ack?: SocketAck
+    ) => {
+      if (!isAdminRole(user.role)) {
+        ack?.({
+          ok: false,
+          error: 'FORBIDDEN',
+        });
+        return;
+      }
+
+      socket.join('admins');
+
+      ack?.({
+        ok: true,
+      });
+    }
+  );
+
+  socket.on(
+    'updateLocation',
+    async (
+      data: {
+        orderId?: string;
+        lat?: number;
+        lng?: number;
+        heading?: number;
+      },
+      ack?: SocketAck
+    ) => {
+      try {
+        if (user.role !== 'COURIER') {
+          ack?.({ ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+
+        const orderId =
+          typeof data?.orderId === 'string' && data.orderId.trim()
+            ? data.orderId.trim()
+            : null;
+        const lat = data?.lat;
+        const lng = data?.lng;
+
+        if (
+          typeof lat !== 'number' ||
+          typeof lng !== 'number' ||
+          !Number.isFinite(lat) ||
+          !Number.isFinite(lng) ||
+          lat < -90 ||
+          lat > 90 ||
+          lng < -180 ||
+          lng > 180
+        ) {
+          ack?.({ ok: false, error: 'INVALID_LOCATION' });
+          return;
+        }
+
+        if (orderId) {
+          const assignedOrder = await prisma.order.findFirst({
+            where: {
+              id: orderId,
+              courierId: user.id,
+              status: {
+                in: ['COURIER_ASSIGNED', 'COURIER_ACCEPTED', 'PICKED_UP', 'ON_THE_WAY', 'ARRIVED'],
+              },
+            },
+            select: { id: true },
+          });
+
+          if (!assignedOrder) {
+            ack?.({ ok: false, error: 'FORBIDDEN' });
+            return;
+          }
+        }
+
+        const courierUpdate = await prisma.courierProfile.updateMany({
+          where: {
+            userId: user.id,
+            verificationStatus: 'APPROVED',
+            isOnline: true,
+          },
+          data: {
+            currentLatitude: lat,
+            currentLongitude: lng,
+            lastLocationUpdate: new Date(),
+          },
+        });
+
+        if (courierUpdate.count !== 1) {
+          ack?.({ ok: false, error: 'COURIER_NOT_AVAILABLE' });
+          return;
+        }
+
+        const heading =
+          typeof data.heading === 'number' && Number.isFinite(data.heading)
+            ? Math.max(0, Math.min(data.heading, 360))
+            : 0;
+
+        const payload = {
+          courierId: user.id,
+          orderId,
+          latitude: lat,
+          longitude: lng,
+          heading,
+          lastLocationAt: new Date().toISOString(),
+        };
+
+        if (orderId) {
+          io.to(`order_${orderId}`).emit('courier.location_updated', payload);
+        }
+        io.to('operations_admins').emit('courier.location_updated', payload);
+
+        ack?.({ ok: true });
+      } catch (error) {
+        console.error('[Socket] updateLocation failed:', error);
+        ack?.({ ok: false, error: 'SERVER_ERROR' });
+      }
+    }
+  );
+
+  socket.on('disconnect', () => {
+    console.log(
+      `[Socket] Disconnected: ${socket.id}`
+    );
+  });
+});
 // Start Server
 const PORT = config.port;
 server.listen(PORT, () => {
@@ -302,4 +804,6 @@ server.listen(PORT, () => {
 ⚙️ Environment: ${config.nodeEnv}
 =============================================
   `);
+
+  startDispatchWorker(io);
 });

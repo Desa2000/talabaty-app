@@ -1,9 +1,8 @@
-'use client';
+﻿'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Store, Bike, MapPin, Navigation, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
-interface MapMarker {
+export interface AdminMapMarker {
   id: string;
   type: 'CUSTOMER' | 'STORE' | 'COURIER';
   lat: number;
@@ -11,140 +10,449 @@ interface MapMarker {
   heading?: number;
   title: string;
   subtitle?: string;
-  category?: string;
+  status?: 'ONLINE' | 'BUSY' | 'OFFLINE';
+}
+
+export interface AdminRoutePoint {
+  lat: number;
+  lng: number;
 }
 
 interface AdminMapProps {
-  markers?: MapMarker[];
+  markers?: AdminMapMarker[];
+  routePath?: AdminRoutePoint[];
   showCoverage?: boolean;
-  selectedOrder?: any;
   height?: string;
+}
+
+let googleMapsPromise: Promise<any> | null = null;
+
+function loadGoogleMaps(): Promise<any> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Google Maps requires a browser.'));
+  }
+
+  const existingGoogle = (window as any).google;
+  if (existingGoogle?.maps) {
+    return Promise.resolve(existingGoogle);
+  }
+
+  if (googleMapsPromise) {
+    return googleMapsPromise;
+  }
+
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    return Promise.reject(
+      new Error('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not configured.'),
+    );
+  }
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const callbackName = '__talabatyGoogleMapsReady';
+
+    (window as any)[callbackName] = () => {
+      const google = (window as any).google;
+
+      delete (window as any)[callbackName];
+
+      if (google?.maps) {
+        resolve(google);
+      } else {
+        reject(new Error('Google Maps failed to initialize.'));
+      }
+    };
+
+    const existingScript = document.getElementById(
+      'talabaty-google-maps-script',
+    ) as HTMLScriptElement | null;
+
+    if (existingScript) {
+      const check = window.setInterval(() => {
+        const google = (window as any).google;
+
+        if (google?.maps) {
+          window.clearInterval(check);
+          resolve(google);
+        }
+      }, 100);
+
+      window.setTimeout(() => {
+        window.clearInterval(check);
+      }, 15000);
+
+      return;
+    }
+
+    const script = document.createElement('script');
+
+    script.id = 'talabaty-google-maps-script';
+    script.async = true;
+    script.defer = true;
+
+    script.src =
+      'https://maps.googleapis.com/maps/api/js' +
+      `?key=${encodeURIComponent(apiKey)}` +
+      '&loading=async' +
+      '&v=weekly' +
+      '&libraries=marker' +
+      '&language=ar' +
+      '&region=SD' +
+      `&callback=${callbackName}`;
+
+    script.onerror = () => {
+      googleMapsPromise = null;
+      reject(new Error('Unable to load Google Maps.'));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return googleMapsPromise;
+}
+
+function markerColor(marker: AdminMapMarker): string {
+  if (marker.type === 'COURIER') {
+    if (marker.status === 'OFFLINE') return '#6B7280';
+    if (marker.status === 'BUSY') return '#F59E0B';
+    return '#FF5722';
+  }
+
+  if (marker.type === 'STORE') {
+    return '#059669';
+  }
+
+  return '#2563EB';
+}
+
+function markerTypeLabel(marker: AdminMapMarker): string {
+  switch (marker.type) {
+    case 'COURIER':
+      return 'مندوب';
+    case 'STORE':
+      return 'متجر';
+    case 'CUSTOMER':
+      return 'عميل';
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function createMarkerContent(marker: AdminMapMarker): HTMLElement {
+  const root = document.createElement('div');
+  const color = markerColor(marker);
+
+  root.style.background = '#16191D';
+  root.style.border = `2px solid ${color}`;
+  root.style.borderRadius = '10px';
+  root.style.padding = '7px 10px';
+  root.style.color = '#FFFFFF';
+  root.style.fontFamily = 'inherit';
+  root.style.fontSize = '11px';
+  root.style.fontWeight = '700';
+  root.style.whiteSpace = 'nowrap';
+  root.style.boxShadow = '0 8px 24px rgba(0,0,0,0.22)';
+  root.style.cursor = 'pointer';
+  root.style.direction = 'rtl';
+
+  root.textContent = marker.title || markerTypeLabel(marker);
+
+  return root;
 }
 
 export default function AdminMap({
   markers = [],
-  showCoverage = true,
-  selectedOrder,
+  routePath = [],
+  showCoverage = false,
   height = '450px',
 }: AdminMapProps) {
-  const [activeTab, setActiveTab] = useState<'KHARTOUM' | 'BAHRI' | 'OMDURMAN'>('KHARTOUM');
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
 
-  // Khartoum Localities Boundaries
-  const coverageAreas = [
-    { name: 'محلية الخرطوم', state: 'نشطة 🟢', center: '15.5640, 32.5840', radius: '20 كم', fee: '500 ج.س' },
-    { name: 'محلية بحري', state: 'نشطة 🟢', center: '15.6150, 32.5320', radius: '18 كم', fee: '500 ج.س' },
-    { name: 'محلية أم درمان', state: 'نشطة 🟢', center: '15.6500, 32.4800', radius: '22 كم', fee: '500 ج.س' },
-  ];
+  const markerInstancesRef = useRef<any[]>([]);
+  const coverageInstancesRef = useRef<any[]>([]);
+  const routeInstanceRef = useRef<any>(null);
+
+  const [googleApi, setGoogleApi] = useState<any>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialize = async () => {
+      try {
+        const google = await loadGoogleMaps();
+
+        if (cancelled || !mapElementRef.current) {
+          return;
+        }
+
+        const { Map } = await google.maps.importLibrary('maps');
+
+        await google.maps.importLibrary('marker');
+
+        const mapId =
+          process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
+
+        const map = new Map(mapElementRef.current, {
+          center: {
+            lat: 15.564,
+            lng: 32.584,
+          },
+          zoom: 12,
+          mapId,
+          disableDefaultUI: true,
+          zoomControl: true,
+          fullscreenControl: true,
+          mapTypeControl: false,
+          streetViewControl: false,
+          clickableIcons: false,
+          gestureHandling: 'greedy',
+        });
+
+        mapRef.current = map;
+        setGoogleApi(google);
+
+        if (showCoverage) {
+          const areas = [
+            {
+              center: { lat: 15.564, lng: 32.584 },
+              radius: 10000,
+            },
+            {
+              center: { lat: 15.615, lng: 32.532 },
+              radius: 10000,
+            },
+            {
+              center: { lat: 15.65, lng: 32.48 },
+              radius: 10000,
+            },
+          ];
+
+          coverageInstancesRef.current = areas.map(
+            (area) =>
+              new google.maps.Circle({
+                map,
+                center: area.center,
+                radius: area.radius,
+                strokeColor: '#FF5722',
+                strokeOpacity: 0.65,
+                strokeWeight: 1.5,
+                fillColor: '#FF5722',
+                fillOpacity: 0.06,
+                clickable: false,
+              }),
+          );
+        }
+      } catch (error) {
+        console.error('[AdminMap]', error);
+
+        if (!cancelled) {
+          setMapError(
+            error instanceof Error
+              ? error.message
+              : 'تعذر تحميل خريطة Google',
+          );
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+
+      markerInstancesRef.current.forEach((marker) => {
+        marker.map = null;
+      });
+
+      coverageInstancesRef.current.forEach((circle) => {
+        circle.setMap(null);
+      });
+
+      routeInstanceRef.current?.setMap(null);
+
+      markerInstancesRef.current = [];
+      coverageInstancesRef.current = [];
+      routeInstanceRef.current = null;
+    };
+  }, [showCoverage]);
+
+  useEffect(() => {
+    if (!googleApi || !mapRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const renderMarkers = async () => {
+      const google = googleApi;
+      const map = mapRef.current;
+
+      const { AdvancedMarkerElement } =
+        await google.maps.importLibrary('marker');
+
+      if (cancelled) {
+        return;
+      }
+
+      markerInstancesRef.current.forEach((marker) => {
+        marker.map = null;
+      });
+
+      markerInstancesRef.current = [];
+
+      const bounds = new google.maps.LatLngBounds();
+
+      for (const markerData of markers) {
+        if (
+          !Number.isFinite(markerData.lat) ||
+          !Number.isFinite(markerData.lng)
+        ) {
+          continue;
+        }
+
+        const content = createMarkerContent(markerData);
+
+        const marker = new AdvancedMarkerElement({
+          map,
+          position: {
+            lat: markerData.lat,
+            lng: markerData.lng,
+          },
+          title: markerData.title,
+          content,
+          zIndex: markerData.type === 'COURIER' ? 30 : 20,
+        });
+
+        const infoContent = document.createElement('div');
+
+        infoContent.style.direction = 'rtl';
+        infoContent.style.minWidth = '180px';
+        infoContent.style.color = '#111827';
+        infoContent.style.fontFamily = 'inherit';
+
+        infoContent.innerHTML = `
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px">
+            ${escapeHtml(markerData.title)}
+          </div>
+          <div style="font-size:11px;color:#4B5563">
+            ${escapeHtml(markerTypeLabel(markerData))}
+          </div>
+          ${
+            markerData.subtitle
+              ? `<div style="font-size:11px;color:#4B5563;margin-top:4px">${escapeHtml(markerData.subtitle)}</div>`
+              : ''
+          }
+        `;
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: infoContent,
+        });
+
+        content.addEventListener('click', () => {
+          infoWindow.open({
+            map,
+            anchor: marker,
+          });
+        });
+
+        markerInstancesRef.current.push(marker);
+        bounds.extend(marker.position);
+      }
+
+      if (markers.length === 1) {
+        map.panTo({
+          lat: markers[0].lat,
+          lng: markers[0].lng,
+        });
+      } else if (markers.length > 1) {
+        map.fitBounds(bounds, 70);
+      }
+    };
+
+    renderMarkers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleApi, markers]);
+
+  useEffect(() => {
+    if (!googleApi || !mapRef.current) {
+      return;
+    }
+
+    if (routeInstanceRef.current) {
+      routeInstanceRef.current.setMap(null);
+      routeInstanceRef.current = null;
+    }
+
+    if (routePath.length < 2) {
+      return;
+    }
+
+    routeInstanceRef.current = new googleApi.maps.Polyline({
+      map: mapRef.current,
+      path: routePath,
+      geodesic: true,
+      strokeColor: '#FF5722',
+      strokeOpacity: 0.92,
+      strokeWeight: 5,
+    });
+
+    const bounds = new googleApi.maps.LatLngBounds();
+
+    routePath.forEach((point) => {
+      bounds.extend(point);
+    });
+
+    mapRef.current.fitBounds(bounds, 80);
+  }, [googleApi, routePath]);
+
+  if (mapError) {
+    return (
+      <div
+        className="w-full bg-[#16191D] border border-gray-800 flex items-center justify-center text-center px-6"
+        style={{ height }}
+        dir="rtl"
+      >
+        <div>
+          <div className="text-sm font-bold text-white">
+            خريطة Google غير متاحة حالياً
+          </div>
+
+          <div className="text-xs text-gray-400 mt-2">
+            تأكد من إعداد مفتاح Maps JavaScript API و Map ID الخاص بطلباتي.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-gray-800 bg-[#14171A] dir-rtl" style={{ height }} dir="rtl">
-      {/* Branded Map Background Graphic Layer */}
-      <div className="absolute inset-0 bg-[#16191D] opacity-95">
-        {/* Grid / Road Network Simulation */}
-        <svg className="w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#FF5722" strokeWidth="0.8" />
-          </pattern>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
+    <div
+      className="relative w-full overflow-hidden border border-gray-800 bg-[#16191D]"
+      style={{ height }}
+      dir="rtl"
+    >
+      <div ref={mapElementRef} className="absolute inset-0" />
 
-        {/* River Nile Visual Representation */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M 300 0 Q 340 180 320 280 T 450 600"
-            fill="none"
-            stroke="#1D3557"
-            strokeWidth="28"
-            strokeLinecap="round"
-            className="opacity-70"
-          />
-        </svg>
-
-        {/* Coverage Polygons Overlay (Khartoum State Localities) */}
-        {showCoverage && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            {/* Khartoum Locality Zone */}
-            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-[#FF5722]/15 border-2 border-[#FF5722] border-dashed animate-pulse flex items-center justify-center">
-              <span className="text-[10px] font-bold text-[#FF5722] bg-[#16191D]/90 px-2 py-0.5 rounded-full border border-[#FF5722]/30">
-                منطقة تغطية طلباتي النشطة - الخرطوم
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Floating Map Legend */}
-      <div className="absolute top-4 right-4 z-10 bg-[#16191D]/90 backdrop-blur-md border border-gray-800 rounded-xl px-3.5 py-2 text-xs flex items-center gap-4 text-gray-300 shadow-xl">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FF5722]" />
-          <span className="font-semibold text-white">الخرطوم النشطة</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-          <span>المتجر</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-          <span>المندوب</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-          <span>عميل التوصيل</span>
-        </div>
-      </div>
-
-      {/* Render Custom Interactive Markers */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center p-8">
-        {/* Sample Customer Destination Marker */}
-        <div className="absolute top-1/4 left-1/3 flex flex-col items-center group cursor-pointer">
-          <div className="bg-white text-gray-900 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-[#FF5722] flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-[#FF5722]" />
-            <span>نقطة التوصيل (الرياض)</span>
-          </div>
-          <div className="w-4 h-4 bg-[#FF5722] rounded-full border-2 border-white shadow-md -mt-1" />
+      <div className="absolute top-4 right-4 z-10 bg-[#16191D]/95 border border-gray-800 px-4 py-3 text-right shadow-xl">
+        <div className="text-xs font-bold text-white">
+          العمليات المباشرة
         </div>
 
-        {/* Sample Merchant Store Marker */}
-        <div className="absolute top-1/2 right-1/3 flex flex-col items-center group cursor-pointer">
-          <div className="bg-[#16191D] border border-emerald-500/40 text-emerald-400 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1">
-            <Store className="w-3.5 h-3.5 text-emerald-400" />
-            <span>مطعم البركة (الرياض)</span>
-          </div>
-          <div className="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-md -mt-1" />
-        </div>
-
-        {/* Sample Courier Live Directional Arrow Marker */}
-        <div className="absolute bottom-1/3 left-1/2 flex flex-col items-center group cursor-pointer">
-          <div className="bg-[#FF5722] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 animate-bounce">
-            <Bike className="w-3.5 h-3.5" />
-            <span>المندوب (في الطريق)</span>
-          </div>
-          <div className="w-9 h-9 bg-[#FF5722] border-2 border-white rounded-full flex items-center justify-center text-white shadow-xl rotate-45 transform">
-            <Navigation className="w-5 h-5 text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Floating Info Card at Bottom */}
-      <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#16191D]/95 backdrop-blur-md border border-gray-800 rounded-2xl p-4 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#FF5722]/15 border border-[#FF5722]/30 flex items-center justify-center text-[#FF5722]">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-white">تغطية طلباتي المعتمدة في السودان 🇸🇩</div>
-            <div className="text-[11px] text-gray-400 mt-0.5">
-              محلية الخرطوم &bull; محلية بحري &bull; محلية أم درمان (خدمة 24/7)
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {coverageAreas.map((area, idx) => (
-            <div key={idx} className="bg-[#0F1114] border border-gray-800 rounded-xl px-3 py-1.5 text-[11px] font-semibold text-gray-300">
-              {area.name}: <span className="text-emerald-400">{area.fee}</span>
-            </div>
-          ))}
+        <div className="text-[11px] text-gray-400 mt-1">
+          المواقع والمسارات يتم تحديثها من السيرفر
         </div>
       </div>
     </div>

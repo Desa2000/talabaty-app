@@ -80,7 +80,6 @@ class NotificationProvider extends ChangeNotifier {
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         fcmToken = await messaging.getToken();
         if (_isDisposed) return;
-        debugPrint('FCM Token: $fcmToken');
 
         await _fcmSubscription?.cancel();
         _fcmSubscription = FirebaseMessaging.onMessage.listen((

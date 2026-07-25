@@ -51,9 +51,22 @@ export const getStores = async (req: Request, res: Response) => {
       },
     });
 
+    const discoverySetting = await prisma.platformSetting.findUnique({
+      where: { key: 'customerStoreDiscoveryRadiusKm' },
+    });
+
+    const parsedDiscoveryRadius = Number.parseFloat(
+      discoverySetting?.value ?? ''
+    );
+
+    const maxRadius =
+      Number.isFinite(parsedDiscoveryRadius) &&
+      parsedDiscoveryRadius > 0
+        ? Math.min(parsedDiscoveryRadius, 100)
+        : 10.0;
+
     const userLat = lat ? parseFloat(lat as string) : null;
     const userLng = lng ? parseFloat(lng as string) : null;
-    const maxRadius = radius ? parseFloat(radius as string) : 25.0; // 25km default radius
 
     const result = stores
       .map((store) => {
