@@ -6,7 +6,6 @@ import '../../data/models/product_model.dart';
 import '../../data/models/order_model.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/user_model.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/mock/data_mapper.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/order_api_service.dart';
@@ -30,7 +29,7 @@ class DataProvider extends ChangeNotifier {
   List<ProductModel> _products = [];
   List<OrderModel> _orders = [];
   List<AddressModel> _addresses = [];
-  List<CourierProfile> _couriers = MockData.mockCourierProfiles;
+  List<CourierProfile> _couriers = [];
   List<UserModel> _users = [];
 
   bool _isInitialized = false;
@@ -66,11 +65,9 @@ class DataProvider extends ChangeNotifier {
       final storesData = prefs.getString('stores');
       if (storesData != null && storesData.isNotEmpty) {
         _stores = DataMapper.decodeStores(storesData);
-      } else {
-        _stores = MockData.mockStores;
       }
     } catch (_) {
-      _stores = MockData.mockStores;
+      _stores = [];
     }
 
     notifyListeners();
@@ -80,7 +77,7 @@ class DataProvider extends ChangeNotifier {
 
     // 3. Connect Socket.IO for real-time order status and location tracking
     try {
-      _socketService.connect();
+      await _socketService.connect();
       _socketService.onOrderStatusUpdate((data) {
         debugPrint('⚡ Real-time Order Status Update via Socket: $data');
         fetchRealOrders();
@@ -149,10 +146,10 @@ class DataProvider extends ChangeNotifier {
       return store;
     } catch (e) {
       debugPrint('Error fetching store details from REST API: $e');
-      return _stores.firstWhere(
-        (s) => s.id == storeId,
-        orElse: () => MockData.mockStores.first,
-      );
+      for (final store in _stores) {
+        if (store.id == storeId) return store;
+      }
+      return null;
     }
   }
 
@@ -234,9 +231,18 @@ class DataProvider extends ChangeNotifier {
             paymentMethod: json['paymentMethod'] == 'BANKAK'
                 ? PaymentMethod.bankak
                 : PaymentMethod.cashOnDelivery,
-            paymentStatus: json['paymentStatus'] == 'PAID'
-                ? PaymentStatus.paid
-                : PaymentStatus.unpaid,
+            paymentStatus: () {
+              final psStr = json['paymentStatus']?.toString().toUpperCase();
+              if (psStr == 'PAID') return PaymentStatus.paid;
+              if (psStr == 'BANKAK_PENDING') return PaymentStatus.bankakPending;
+              if (psStr == 'BANKAK_SUBMITTED')
+                return PaymentStatus.bankakSubmitted;
+              if (psStr == 'BANKAK_VERIFIED')
+                return PaymentStatus.bankakVerified;
+              if (psStr == 'BANKAK_REJECTED')
+                return PaymentStatus.bankakRejected;
+              return PaymentStatus.unpaid;
+            }(),
             subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
             deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 500.0,
             serviceFee: 0.0,

@@ -604,7 +604,79 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 return;
                               }
 
-                              context.read<CartProvider>().addProduct(
+                              final cart = context.read<CartProvider>();
+                              if (cart.isFromDifferentStore(product)) {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    title: Text(
+                                      'متجر مختلف',
+                                      style: GoogleFonts.cairo(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    content: Text(
+                                      'طلباتك الحالية من متجر آخر. هل تريد تفريغ السلة والبدء من هذا المتجر؟',
+                                      style: GoogleFonts.cairo(),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: Text(
+                                          'إلغاء',
+                                          style: GoogleFonts.cairo(
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.primaryColor,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          cart.addProduct(
+                                            product,
+                                            quantity: _quantity,
+                                            selectedOptions: Map.from(
+                                              _selectedOptions,
+                                            ),
+                                            selectedAddOns: List.from(
+                                              _selectedAddOns,
+                                            ),
+                                            notes: _notesController.text,
+                                            forceClearStoreMismatch: true,
+                                          );
+                                          context.pop();
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'تم تفريغ السلة وإضافة المنتج بنجاح',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          'تفريغ وإضافة',
+                                          style: GoogleFonts.cairo(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
+                              cart.addProduct(
                                 product,
                                 quantity: _quantity,
                                 selectedOptions: Map.from(_selectedOptions),

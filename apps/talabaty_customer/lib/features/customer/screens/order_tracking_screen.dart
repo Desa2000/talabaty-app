@@ -10,6 +10,7 @@ import '../../../core/constants/enums.dart';
 import '../../../core/providers/data_provider.dart';
 import '../../../core/services/routing_service.dart';
 import '../../../data/models/order_model.dart';
+import '../../../data/services/order_api_service.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -378,28 +379,140 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
           ),
           const SizedBox(height: 6),
 
-          // Address
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                color: Color(0xFF9AA0A6),
-                size: 18,
+          // Bankak Pending / Rejection Banners
+          if (order.paymentMethod == PaymentMethod.bankak) ...[
+            if (order.paymentStatus == PaymentStatus.bankakPending ||
+                order.paymentStatus == PaymentStatus.bankakSubmitted) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.hourglass_top_rounded,
+                          color: Colors.blue,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'جاري التحقق من عملية الدفع',
+                          style: GoogleFonts.cairo(
+                            color: Colors.blue.shade200,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'سيتم تأكيد طلبك بعد مراجعة عملية بنكك بواسطة الإدارة المالية.',
+                      style: GoogleFonts.cairo(
+                        color: const Color(0xFF9AA0A6),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  order.address.address,
-                  style: GoogleFonts.cairo(
-                    color: const Color(0xFF9AA0A6),
-                    fontSize: 12,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+            ] else if (order.paymentStatus == PaymentStatus.bankakRejected) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'تعذر تأكيد عملية الدفع',
+                          style: GoogleFonts.cairo(
+                            color: Colors.red.shade200,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'لم نتمكن من مطابقة إشعار التحويل البنكي. يمكنك إدخال 4 أرقام جديدة أو التحويل كاش.',
+                      style: GoogleFonts.cairo(
+                        color: const Color(0xFF9AA0A6),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () =>
+                                _showReSubmitDialog(context, order),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: Text(
+                              'إعادة إدخال الرقم',
+                              style: GoogleFonts.cairo(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _switchToCash(context, order),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.green,
+                              side: const BorderSide(color: Colors.green),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: Text(
+                              'تحويل إلى كاش',
+                              style: GoogleFonts.cairo(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
+          ],
 
           if (order.status == OrderStatus.delivered) ...[
             const SizedBox(height: 16),
@@ -450,6 +563,106 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
         return 'تم التسليم';
       default:
         return 'جاري تتبع طلبك...';
+    }
+  }
+
+  Future<void> _showReSubmitDialog(
+    BuildContext context,
+    OrderModel order,
+  ) async {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'إعادة إدخال رقم عملية بنكك',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: InputDecoration(
+            hintText: 'أدخل آخر 4 أرقام من الإشعار (4 أرقام)',
+            hintStyle: GoogleFonts.cairo(fontSize: 12),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final last4 = controller.text.trim();
+              if (!RegExp(r'^\d{4}$').hasMatch(last4)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('أدخل 4 أرقام فقط بشكل صحيح'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await OrderApiService().submitBankakLast4(order.id, last4);
+                await context.read<DataProvider>().fetchRealOrders();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم إرسال رقم العملية للتحقق'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('خطأ: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5722),
+            ),
+            child: Text(
+              'إرسال',
+              style: GoogleFonts.cairo(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _switchToCash(BuildContext context, OrderModel order) async {
+    try {
+      await OrderApiService().switchToCash(order.id);
+      await context.read<DataProvider>().fetchRealOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم التحويل إلى الدفع عند الاستلام بنجاح'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

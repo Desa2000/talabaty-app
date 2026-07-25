@@ -208,31 +208,25 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
       );
     }
 
-    final store = dataProvider.stores.firstWhere(
-      (s) => s.ownerId == merchantId,
-      orElse: () => dataProvider.stores.isNotEmpty
-          ? dataProvider.stores.first
-          : StoreModel(
-              id: 'store_$merchantId',
-              ownerId: merchantId,
-              name: 'مطعم جديد',
-              type: StoreType.restaurant,
-              phone: merchantUser.phone,
-              area: '',
-              street: '',
-              landmark: '',
-              latitude: 15.5006,
-              longitude: 32.5599,
-              openingTime: '08:00',
-              closingTime: '23:00',
-              preparationTime: '20',
-              minimumOrder: 1000,
-              deliveryFee: 3000,
-              status: 'active',
-              rating: 5.0,
-              ratingCount: 1,
-            ),
-    );
+    StoreModel? store;
+    for (final candidate in dataProvider.stores) {
+      if (candidate.ownerId == merchantId) {
+        store = candidate;
+        break;
+      }
+    }
+
+    if (store == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('إعدادات المطعم')),
+        body: const Center(
+          child: Text(
+            'لا يوجد مطعم مرتبط بحسابك حالياً',
+            style: TextStyle(fontFamily: 'Cairo'),
+          ),
+        ),
+      );
+    }
 
     // Initialize controllers with current store values once on load
     if (_isInit) {
@@ -332,7 +326,7 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
                           : Switch.adaptive(
                               value: _isOpen,
                               activeColor: Colors.green,
-                              onChanged: (v) => _toggleStoreStatus(store.id, v),
+                              onChanged: (v) => _toggleStoreStatus(store!.id, v),
                             ),
                     ],
                   ),
@@ -581,7 +575,7 @@ class _MerchantSettingsTabState extends State<MerchantSettingsTab> {
                     ),
                     onPressed: _isUpdating
                         ? null
-                        : () => _saveSettings(store, merchantUser),
+                        : () => _saveSettings(store!, merchantUser),
                     child: _isUpdating
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(

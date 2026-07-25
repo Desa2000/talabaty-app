@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../utils/prisma';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { io } from '../../server';
+import { NotificationService } from '../../services/notification.service';
+import { RoutingService } from '../../services/routing.service';
 
 // Audit Logger Helper
 async function logAuditAction(
@@ -646,56 +648,260 @@ export const getAdminPayments = async (req: Request, res: Response) => {
 
 export const verifyBankakPayment = async (req: Request, res: Response) => {
   try {
-    const adminId = (req as AuthenticatedRequest).user?.id!;
+    const adminId = (req as AuthenticatedRequest).user?.id;
+
+    if (!adminId) {
+      return res.status(401).json({ error: 'غير مصرح به' });
+    }
+
     const { id } = req.params;
 
-    const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          status: true,
+        },
+      });
 
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        paymentStatus: 'BANKAK_VERIFIED',
-      },
+      if (!current) throw new Error('ORDER_NOT_FOUND');
+
+      if (
+        current.paymentMethod !== 'BANKAK' ||
+        current.paymentStatus !== 'BANKAK_SUBMITTED' ||
+        current.status !== 'PENDING_MERCHANT'
+      ) {
+        throw new Error('BANKAK_VERIFY_NOT_ALLOWED');
+      }
+
+      const claim = await tx.order.updateMany({
+        where: {
+          id,
+          paymentMethod: 'BANKAK',
+          paymentStatus: 'BANKAK_SUBMITTED',
+          status: 'PENDING_MERCHANT',
+        },
+        data: {
+          paymentStatus: 'BANKAK_VERIFIED',
+          paymentVerifiedAt: new Date(),
+          paymentVerifiedBy: adminId,
+          paymentRejectionReason: null,
+        },
+      });
+
+      if (claim.count !== 1) {
+        throw new Error('BANKAK_VERIFY_NOT_ALLOWED');
+      }
+
+      const updated = await tx.order.findUnique({
+        where: { id },
+        include: {
+          store: { include: { merchant: true } },
+          customer: true,
+        },
+      });
+
+      if (!updated) throw new Error('ORDER_NOT_FOUND');
+
+      return {
+        updated,
+        oldPaymentStatus: current.paymentStatus,
+      };
     });
 
-    await logAuditAction(adminId, 'ADMIN_VERIFIED_BANKAK', 'ORDER', id, { oldStatus: order.paymentStatus }, { newStatus: 'BANKAK_VERIFIED' });
+    const updated = result.updated;
+
+    await logAuditAction(
+      adminId,
+      'ADMIN_VERIFIED_BANKAK',
+      'ORDER',
+      id,
+      { oldStatus: result.oldPaymentStatus },
+      { newStatus: 'BANKAK_VERIFIED' }
+    );
+
+    try {
+      io.to('admins').emit('order.updated', updated);
+      io.to(`user_${updated.customerId}`).emit('order.updated', updated);
+
+      // Merchant only receives Bankak order AFTER successful verification.
+      io.to(`store_${updated.storeId}`).emit('order.created', updated);
+
+      NotificationService.sendToUser({
+        userId: updated.customerId,
+        title: 'تم تأكيد دفع طلبك ✅',
+        body: `تم توثيق تحويل بنكك بنجاح للطلب #${updated.orderNumber}`,
+        data: {
+          type: 'BANKAK_VERIFIED',
+          orderId: updated.id,
+        },
+        appType: 'CUSTOMER',
+      });
+
+      const merchantUserId = updated.store?.merchant?.userId;
+
+      if (merchantUserId) {
+        NotificationService.sendToUser({
+          userId: merchantUserId,
+          title: 'طلب مؤكد الدفع 📦',
+          body: `تم تأكيد دفع الطلب #${updated.orderNumber}`,
+          data: {
+            type: 'ORDER_PAID',
+            orderId: updated.id,
+          },
+          appType: 'MERCHANT',
+        });
+      }
+    } catch (_) {}
 
     return res.json(updated);
   } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'فشل توثيق الدفع' });
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ error: 'الطلب غير موجود' });
+    }
+
+    if (error.message === 'BANKAK_VERIFY_NOT_ALLOWED') {
+      return res.status(409).json({
+        error: 'لا يمكن توثيق الدفع لأن حالة طلب بنكك تغيرت أو لم يتم إرسال رقم العملية',
+        code: 'BANKAK_VERIFY_NOT_ALLOWED',
+      });
+    }
+
+    return res.status(500).json({
+      error: error.message || 'فشل توثيق الدفع',
+    });
   }
 };
+
 
 export const rejectBankakPayment = async (req: Request, res: Response) => {
   try {
-    const adminId = (req as AuthenticatedRequest).user?.id!;
-    const { id } = req.params;
-    const { reason } = req.body;
+    const adminId = (req as AuthenticatedRequest).user?.id;
 
-    if (!reason || reason.trim() === '') {
-      return res.status(400).json({ error: 'يرجى تقديم سبب رفض التحويل' });
+    if (!adminId) {
+      return res.status(401).json({ error: 'غير مصرح به' });
     }
 
-    const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
+    const { id } = req.params;
+    const reason =
+      typeof req.body?.reason === 'string'
+        ? req.body.reason.trim()
+        : '';
 
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        paymentStatus: 'BANKAK_REJECTED',
-        merchantNotes: `رفض التحويل البنكي: ${reason}`,
-      },
+    if (!reason) {
+      return res.status(400).json({
+        error: 'يرجى تقديم سبب رفض التحويل',
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          status: true,
+        },
+      });
+
+      if (!current) throw new Error('ORDER_NOT_FOUND');
+
+      if (
+        current.paymentMethod !== 'BANKAK' ||
+        current.paymentStatus !== 'BANKAK_SUBMITTED' ||
+        current.status !== 'PENDING_MERCHANT'
+      ) {
+        throw new Error('BANKAK_REJECT_NOT_ALLOWED');
+      }
+
+      const claim = await tx.order.updateMany({
+        where: {
+          id,
+          paymentMethod: 'BANKAK',
+          paymentStatus: 'BANKAK_SUBMITTED',
+          status: 'PENDING_MERCHANT',
+        },
+        data: {
+          paymentStatus: 'BANKAK_REJECTED',
+          paymentRejectionReason: reason,
+          paymentVerifiedAt: null,
+          paymentVerifiedBy: null,
+        },
+      });
+
+      if (claim.count !== 1) {
+        throw new Error('BANKAK_REJECT_NOT_ALLOWED');
+      }
+
+      const updated = await tx.order.findUnique({
+        where: { id },
+        include: {
+          store: { include: { merchant: true } },
+          customer: true,
+        },
+      });
+
+      if (!updated) throw new Error('ORDER_NOT_FOUND');
+
+      return {
+        updated,
+        oldPaymentStatus: current.paymentStatus,
+      };
     });
 
-    await logAuditAction(adminId, 'ADMIN_REJECTED_BANKAK', 'ORDER', id, { oldStatus: order.paymentStatus }, { newStatus: 'BANKAK_REJECTED', reason });
+    const updated = result.updated;
+
+    await logAuditAction(
+      adminId,
+      'ADMIN_REJECTED_BANKAK',
+      'ORDER',
+      id,
+      { oldStatus: result.oldPaymentStatus },
+      {
+        newStatus: 'BANKAK_REJECTED',
+        reason,
+      }
+    );
+
+    try {
+      io.to('admins').emit('order.updated', updated);
+      io.to(`user_${updated.customerId}`).emit('order.updated', updated);
+
+      NotificationService.sendToUser({
+        userId: updated.customerId,
+        title: 'تعذر تأكيد عملية الدفع',
+        body: `تعذر توثيق تحويل بنكك للطلب #${updated.orderNumber}: ${reason}`,
+        data: {
+          type: 'BANKAK_REJECTED',
+          orderId: updated.id,
+          reason,
+        },
+        appType: 'CUSTOMER',
+      });
+    } catch (_) {}
 
     return res.json(updated);
   } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'فشل رفض التوثيق' });
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ error: 'الطلب غير موجود' });
+    }
+
+    if (error.message === 'BANKAK_REJECT_NOT_ALLOWED') {
+      return res.status(409).json({
+        error: 'لا يمكن رفض الدفع لأن حالة طلب بنكك تغيرت أو لم يتم إرسال رقم العملية',
+        code: 'BANKAK_REJECT_NOT_ALLOWED',
+      });
+    }
+
+    return res.status(500).json({
+      error: error.message || 'فشل رفض التوثيق',
+    });
   }
 };
-
 // 7. COVERAGE & PRICING MANAGEMENT
 export const getAdminCoverage = async (req: Request, res: Response) => {
   try {
@@ -788,24 +994,209 @@ export const getAdminSettings = async (req: Request, res: Response) => {
 export const updateAdminSettings = async (req: Request, res: Response) => {
   try {
     const adminId = (req as AuthenticatedRequest).user?.id!;
-    const body = req.body as Record<string, string>;
 
-    for (const [key, value] of Object.entries(body)) {
-      await prisma.platformSetting.upsert({
-        where: { key },
-        update: { value: String(value) },
-        create: { key, value: String(value) },
+    if (
+      !req.body ||
+      typeof req.body !== 'object' ||
+      Array.isArray(req.body)
+    ) {
+      return res.status(400).json({
+        error: 'بيانات الإعدادات غير صالحة',
       });
     }
 
-    await logAuditAction(adminId, 'ADMIN_CHANGED_SETTINGS', 'SETTINGS', 'global', null, body);
+    const body = req.body as Record<string, unknown>;
+    const normalized: Record<string, string> = {};
 
-    return res.json({ message: 'تم حفظ الإعدادات بنجاح' });
+    for (const [key, rawValue] of Object.entries(body)) {
+      switch (key) {
+        case 'applicationFeeEnabled': {
+          const value = String(rawValue).toLowerCase();
+
+          if (value !== 'true' && value !== 'false') {
+            return res.status(400).json({
+              error: 'applicationFeeEnabled يجب أن تكون true أو false',
+            });
+          }
+
+          normalized[key] = value;
+          break;
+        }
+
+        case 'applicationFeeType': {
+          const value = String(rawValue).toUpperCase();
+
+          if (value !== 'FIXED' && value !== 'PERCENT') {
+            return res.status(400).json({
+              error: 'نوع رسوم التطبيق يجب أن يكون FIXED أو PERCENT',
+            });
+          }
+
+          normalized[key] = value;
+          break;
+        }
+
+        case 'applicationFeeValue': {
+          const value = Number(rawValue);
+
+          if (!Number.isFinite(value) || value < 0) {
+            return res.status(400).json({
+              error: 'قيمة رسوم التطبيق يجب أن تكون رقماً موجباً أو صفراً',
+            });
+          }
+
+          normalized[key] = String(value);
+          break;
+        }
+
+        case 'customerStoreDiscoveryRadiusKm':
+        case 'courierSearchRadiusKm': {
+          const value = Number(rawValue);
+
+          if (
+            !Number.isFinite(value) ||
+            value <= 0 ||
+            value > 100
+          ) {
+            return res.status(400).json({
+              error: `${key} يجب أن تكون أكبر من 0 ولا تتجاوز 100 كم`,
+            });
+          }
+
+          normalized[key] = String(value);
+          break;
+        }
+
+        case 'courierCandidateLimit': {
+          const value = Number(rawValue);
+
+          if (
+            !Number.isInteger(value) ||
+            value < 1 ||
+            value > 20
+          ) {
+            return res.status(400).json({
+              error: 'courierCandidateLimit يجب أن تكون بين 1 و 20',
+            });
+          }
+
+          normalized[key] = String(value);
+          break;
+        }
+
+        case 'courierOfferTimeoutSeconds': {
+          const value = Number(rawValue);
+
+          if (
+            !Number.isInteger(value) ||
+            value < 10 ||
+            value > 120
+          ) {
+            return res.status(400).json({
+              error:
+                'courierOfferTimeoutSeconds يجب أن تكون بين 10 و 120 ثانية',
+            });
+          }
+
+          normalized[key] = String(value);
+          break;
+        }
+
+        default: {
+          if (
+            typeof rawValue !== 'string' &&
+            typeof rawValue !== 'number' &&
+            typeof rawValue !== 'boolean'
+          ) {
+            return res.status(400).json({
+              error: `قيمة الإعداد ${key} غير صالحة`,
+            });
+          }
+
+          normalized[key] = String(rawValue);
+        }
+      }
+    }
+
+    if (Object.keys(normalized).length === 0) {
+      return res.status(400).json({
+        error: 'لم يتم إرسال أي إعدادات للتحديث',
+      });
+    }
+
+    // Validate the effective application fee configuration,
+    // even when only the type OR only the value is being changed.
+    if (
+      normalized.applicationFeeType !== undefined ||
+      normalized.applicationFeeValue !== undefined
+    ) {
+      const [existingType, existingValue] = await Promise.all([
+        prisma.platformSetting.findUnique({
+          where: { key: 'applicationFeeType' },
+        }),
+        prisma.platformSetting.findUnique({
+          where: { key: 'applicationFeeValue' },
+        }),
+      ]);
+
+      const effectiveType = (
+        normalized.applicationFeeType ??
+        existingType?.value ??
+        'FIXED'
+      ).toUpperCase();
+
+      const effectiveValue = Number(
+        normalized.applicationFeeValue ??
+        existingValue?.value ??
+        '0'
+      );
+
+      if (!Number.isFinite(effectiveValue) || effectiveValue < 0) {
+        return res.status(400).json({
+          error: 'قيمة رسوم التطبيق غير صالحة',
+        });
+      }
+
+      if (
+        effectiveType === 'PERCENT' &&
+        effectiveValue > 100
+      ) {
+        return res.status(400).json({
+          error: 'نسبة رسوم التطبيق لا يمكن أن تتجاوز 100%',
+        });
+      }
+    }
+
+    // Save all settings atomically.
+    await prisma.$transaction(
+      Object.entries(normalized).map(([key, value]) =>
+        prisma.platformSetting.upsert({
+          where: { key },
+          update: { value },
+          create: { key, value },
+        })
+      )
+    );
+
+    await logAuditAction(
+      adminId,
+      'ADMIN_CHANGED_SETTINGS',
+      'SETTINGS',
+      'global',
+      null,
+      normalized
+    );
+
+    return res.json({
+      message: 'تم حفظ الإعدادات بنجاح',
+      settings: normalized,
+    });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'فشل حفظ الإعدادات' });
+    return res.status(500).json({
+      error: error.message || 'فشل حفظ الإعدادات',
+    });
   }
 };
-
 // 11. SUPER ADMIN USER MANAGEMENT
 export const getAdminUsers = async (req: Request, res: Response) => {
   try {
@@ -859,5 +1250,375 @@ export const createAdminUser = async (req: Request, res: Response) => {
     return res.status(201).json(user);
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'فشل إنشاء حساب المدير' });
+  }
+};
+
+// =============================================
+// LIVE OPERATIONS MAP
+// =============================================
+
+export const getAdminLiveMap = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const couriers = await prisma.courierProfile.findMany({
+      where: {
+        verificationStatus: 'APPROVED',
+      },
+      select: {
+        userId: true,
+        status: true,
+        isOnline: true,
+        currentLatitude: true,
+        currentLongitude: true,
+        lastLocationUpdate: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: {
+        lastLocationUpdate: 'desc',
+      },
+    });
+
+    const courierIds = couriers.map(
+      (courier) => courier.userId
+    );
+
+    const activeOrders =
+      courierIds.length === 0
+        ? []
+        : await prisma.order.findMany({
+            where: {
+              courierId: {
+                in: courierIds,
+              },
+              status: {
+                in: [
+                  'COURIER_ASSIGNED',
+                  'COURIER_ACCEPTED',
+                  'PICKED_UP',
+                  'ON_THE_WAY',
+                  'ARRIVED',
+                ],
+              },
+            },
+            include: {
+              store: {
+                select: {
+                  id: true,
+                  name: true,
+                  latitude: true,
+                  longitude: true,
+                  address: true,
+                },
+              },
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              locationLogs: {
+                orderBy: {
+                  createdAt: 'desc',
+                },
+                take: 1,
+                select: {
+                  latitude: true,
+                  longitude: true,
+                  heading: true,
+                  speed: true,
+                  createdAt: true,
+                },
+              },
+            },
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          });
+
+    // There must never be more than one active delivery shown
+    // for the same courier on the operations map.
+    const activeOrderByCourier = new Map<string, any>();
+
+    for (const order of activeOrders) {
+      if (
+        order.courierId &&
+        !activeOrderByCourier.has(order.courierId)
+      ) {
+        activeOrderByCourier.set(
+          order.courierId,
+          order
+        );
+      }
+    }
+
+    const result = couriers.map((courier) => {
+      const order =
+        activeOrderByCourier.get(courier.userId) ?? null;
+
+      const lastOrderLocation =
+        order?.locationLogs?.[0] ?? null;
+
+      let liveStatus:
+        | 'ONLINE'
+        | 'BUSY'
+        | 'OFFLINE';
+
+      if (
+        !courier.isOnline ||
+        courier.status === 'OFFLINE'
+      ) {
+        liveStatus = 'OFFLINE';
+      } else if (
+        order ||
+        courier.status === 'BUSY'
+      ) {
+        liveStatus = 'BUSY';
+      } else {
+        liveStatus = 'ONLINE';
+      }
+
+      return {
+        id: courier.userId,
+        name: courier.user.name,
+        phone: courier.user.phone,
+
+        status: liveStatus,
+
+        latitude: courier.currentLatitude,
+        longitude: courier.currentLongitude,
+
+        heading:
+          lastOrderLocation?.heading ?? null,
+
+        lastLocationAt:
+          courier.lastLocationUpdate?.toISOString() ??
+          null,
+
+        activeOrder: order
+          ? {
+              id: order.id,
+              orderNumber: order.orderNumber,
+              status: order.status,
+
+              // Route/ETA will be filled by the routing layer.
+              etaMinutes: null,
+              distanceMeters: null,
+              routePath: [],
+
+              store: {
+                id: order.store.id,
+                name: order.store.name,
+                latitude: order.store.latitude,
+                longitude: order.store.longitude,
+              },
+
+              customer: {
+                id: order.customer.id,
+                name: order.customer.name,
+                latitude: order.deliveryLatitude,
+                longitude: order.deliveryLongitude,
+              },
+            }
+          : null,
+      };
+    });
+
+    return res.json({
+      couriers: result,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error(
+      '[Admin Live Map] Failed to load live operations:',
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        error.message ||
+        'تعذر جلب بيانات العمليات المباشرة',
+    });
+  }
+};
+
+// =============================================
+// LIVE OPERATIONS - SELECTED COURIER ROUTE
+// =============================================
+
+export const getAdminLiveRoute = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { courierId } = req.params;
+
+    const courier = await prisma.courierProfile.findUnique({
+      where: {
+        userId: courierId,
+      },
+      select: {
+        userId: true,
+        vehicleType: true,
+        verificationStatus: true,
+        currentLatitude: true,
+        currentLongitude: true,
+      },
+    });
+
+    if (
+      !courier ||
+      courier.verificationStatus !== 'APPROVED'
+    ) {
+      return res.status(404).json({
+        error: 'المندوب غير موجود',
+      });
+    }
+
+    if (
+      courier.currentLatitude == null ||
+      courier.currentLongitude == null ||
+      !Number.isFinite(courier.currentLatitude) ||
+      !Number.isFinite(courier.currentLongitude)
+    ) {
+      return res.status(409).json({
+        error: 'موقع المندوب غير متاح حالياً',
+      });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        courierId,
+        status: {
+          in: [
+            'COURIER_ASSIGNED',
+            'COURIER_ACCEPTED',
+            'PICKED_UP',
+            'ON_THE_WAY',
+            'ARRIVED',
+          ],
+        },
+      },
+      include: {
+        store: {
+          select: {
+            id: true,
+            name: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        error: 'لا يوجد طلب نشط لهذا المندوب',
+      });
+    }
+
+    const goingToCustomer = [
+      'PICKED_UP',
+      'ON_THE_WAY',
+      'ARRIVED',
+    ].includes(order.status);
+
+    let destinationLatitude: number;
+    let destinationLongitude: number;
+    let destinationName: string;
+    let destinationType: 'STORE' | 'CUSTOMER';
+
+    if (goingToCustomer) {
+      destinationLatitude = order.deliveryLatitude;
+      destinationLongitude = order.deliveryLongitude;
+      destinationName =
+        order.customer.name || 'العميل';
+      destinationType = 'CUSTOMER';
+    } else {
+      if (
+        order.store.latitude == null ||
+        order.store.longitude == null ||
+        !Number.isFinite(order.store.latitude) ||
+        !Number.isFinite(order.store.longitude)
+      ) {
+        return res.status(409).json({
+          error: 'موقع المتجر غير متاح',
+        });
+      }
+
+      destinationLatitude = order.store.latitude;
+      destinationLongitude = order.store.longitude;
+      destinationName = order.store.name;
+      destinationType = 'STORE';
+    }
+
+    const route = await RoutingService.computeRoute(
+      {
+        latitude: courier.currentLatitude,
+        longitude: courier.currentLongitude,
+      },
+      {
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+      },
+      courier.vehicleType
+    );
+
+    return res.json({
+      courierId,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      orderStatus: order.status,
+
+      phase: goingToCustomer
+        ? 'TO_CUSTOMER'
+        : 'TO_STORE',
+
+      destination: {
+        type: destinationType,
+        name: destinationName,
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+      },
+
+      distanceMeters: route.distanceMeters,
+      durationSeconds: route.durationSeconds,
+      etaMinutes: Math.max(
+        1,
+        Math.ceil(route.durationSeconds / 60)
+      ),
+
+      encodedPolyline: route.encodedPolyline,
+      provider: route.status,
+
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error(
+      '[Admin Live Route] Failed:',
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        error.message ||
+        'تعذر حساب مسار المندوب',
+    });
   }
 };

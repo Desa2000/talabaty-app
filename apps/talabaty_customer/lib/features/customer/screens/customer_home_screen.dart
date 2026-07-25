@@ -152,7 +152,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             SliverToBoxAdapter(child: _buildCategories(context)),
             SliverToBoxAdapter(
               child: _buildSectionTitle(
-                '🍽️ المطاعم',
+                'المطاعم',
                 '${restaurants.length} مطعم',
               ),
             ),
@@ -161,7 +161,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
             SliverToBoxAdapter(
               child: _buildSectionTitle(
-                '🛒 سوبرماركت',
+                'السوبرماركت',
                 '${supermarkets.length} متجر',
               ),
             ),
@@ -169,19 +169,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               child: _buildHorizontalStoreList(context, supermarkets),
             ),
             SliverToBoxAdapter(
-              child: _buildSectionTitle(
-                '💊 الصيدليات',
-                '${pharmacies.length} صيدلية',
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: _buildHorizontalStoreList(context, pharmacies),
-            ),
-            SliverToBoxAdapter(
-              child: _buildSectionTitle(
-                '📍 الأقرب إليك',
-                '${nearby.length} متجر',
-              ),
+              child: _buildSectionTitle('الأقرب إليك', '${nearby.length} متجر'),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -211,7 +199,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'أهلاً، $userName 👋',
+                  'أهلاً، $userName',
                   style: GoogleFonts.cairo(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -358,7 +346,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'خصم حصري 🔥',
+                          'خصم حصري',
                           style: GoogleFonts.cairo(
                             color: Colors.white,
                             fontSize: 12,
@@ -418,7 +406,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 context,
                 Icons.restaurant_rounded,
                 'المطاعم',
-                const Color(0xFFFF6A00),
+                const Color(0xFFFF5722),
                 'restaurant',
               ),
               _buildCategoryChip(
@@ -427,20 +415,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 'سوبرماركت',
                 const Color(0xFF2E7D32),
                 'supermarket',
-              ),
-              _buildCategoryChip(
-                context,
-                Icons.local_pharmacy_rounded,
-                'صيدلية',
-                const Color(0xFF007AFF),
-                'pharmacy',
-              ),
-              _buildCategoryChip(
-                context,
-                Icons.card_giftcard_rounded,
-                'هدايا',
-                const Color(0xFF9C27B0),
-                'gift',
               ),
             ],
           ),

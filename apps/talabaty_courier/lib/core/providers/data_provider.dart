@@ -6,7 +6,6 @@ import '../../data/models/product_model.dart';
 import '../../data/models/order_model.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/user_model.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/mock/data_mapper.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/order_api_service.dart';
@@ -30,7 +29,7 @@ class DataProvider extends ChangeNotifier {
   List<ProductModel> _products = [];
   List<OrderModel> _orders = [];
   List<AddressModel> _addresses = [];
-  List<CourierProfile> _couriers = MockData.mockCourierProfiles;
+  List<CourierProfile> _couriers = [];
   List<UserModel> _users = [];
 
   bool _isInitialized = false;
@@ -66,11 +65,9 @@ class DataProvider extends ChangeNotifier {
       final storesData = prefs.getString('stores');
       if (storesData != null && storesData.isNotEmpty) {
         _stores = DataMapper.decodeStores(storesData);
-      } else {
-        _stores = MockData.mockStores;
       }
     } catch (_) {
-      _stores = MockData.mockStores;
+      _stores = [];
     }
 
     notifyListeners();
@@ -80,13 +77,23 @@ class DataProvider extends ChangeNotifier {
 
     // 3. Connect Socket.IO for real-time order status and location tracking
     try {
-      _socketService.connect();
+      await _socketService.connect();
       _socketService.onOrderStatusUpdate((data) {
         debugPrint('⚡ Real-time Order Status Update via Socket: $data');
         fetchRealOrders();
       });
       _socketService.onOrderCreated((data) {
         debugPrint('⚡ Real-time Order Created via Socket: $data');
+        fetchRealOrders();
+      });
+
+      _socketService.onCourierOfferReceived((data) {
+        debugPrint(
+          '🚚 Targeted courier offer received via Socket: ${data['id']}',
+        );
+
+        // REST remains authoritative. Refresh so the offer shown in
+        // the UI is exactly the currently-live server-side offer.
         fetchRealOrders();
       });
     } catch (e) {
@@ -149,10 +156,10 @@ class DataProvider extends ChangeNotifier {
       return store;
     } catch (e) {
       debugPrint('Error fetching store details from REST API: $e');
-      return _stores.firstWhere(
-        (s) => s.id == storeId,
-        orElse: () => MockData.mockStores.first,
-      );
+      for (final store in _stores) {
+        if (store.id == storeId) return store;
+      }
+      return null;
     }
   }
 
@@ -245,6 +252,19 @@ class DataProvider extends ChangeNotifier {
             createdAt: json['createdAt'] != null
                 ? DateTime.parse(json['createdAt'])
                 : DateTime.now(),
+            dispatchOfferId:
+                json['dispatchOfferId']?.toString(),
+            offerRank: json['offerRank'] is num
+                ? (json['offerRank'] as num).toInt()
+                : null,
+            offerExpiresAt:
+                json['offerExpiresAt'] != null
+                    ? DateTime.tryParse(
+                        json['offerExpiresAt'].toString(),
+                      )
+                    : null,
+            isTargetedOffer:
+                json['_targeted'] == true,
           );
           parsed.add(order);
         } catch (e) {
@@ -360,6 +380,17 @@ class DataProvider extends ChangeNotifier {
       await fetchRealOrders();
     } catch (e) {
       debugPrint('Error courier accept order: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> courierRejectOffer(String orderId) async {
+    try {
+      await _orderApiService.courierRejectOffer(orderId);
+      await fetchRealOrders();
+    } catch (e) {
+      debugPrint('Error courier reject offer: $e');
+      rethrow;
     }
   }
 
@@ -433,8 +464,8 @@ class DataProvider extends ChangeNotifier {
     return _orders
         .where(
           (o) =>
-              o.status == OrderStatus.readyForPickup ||
-              o.status == OrderStatus.searchingCourier,
+              o.status == OrderStatus.searchingCourier &&
+              o.hasLiveDispatchOffer,
         )
         .toList();
   }

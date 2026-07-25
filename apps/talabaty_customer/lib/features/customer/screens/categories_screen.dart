@@ -22,10 +22,6 @@ class CategoriesScreen extends StatelessWidget {
     final supermarketCount = stores
         .where((s) => s.type == StoreType.supermarket)
         .length;
-    final pharmacyCount = stores
-        .where((s) => s.type == StoreType.pharmacy)
-        .length;
-    final giftCount = stores.where((s) => s.type == StoreType.gift).length;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -41,9 +37,9 @@ class CategoriesScreen extends StatelessWidget {
                   _buildCategoryCard(
                     context,
                     title: 'المطاعم',
-                    description: 'أشهى المأكولات وأسرع توصيل',
+                    description: 'أشهى المأكولات وأسرع توصيل لجميع الوجبات',
                     icon: Icons.restaurant_rounded,
-                    color: const Color(0xFFFF8C00),
+                    color: const Color(0xFFFF5722),
                     storeCount: restaurantCount,
                     route: '/customer/stores/restaurant',
                     index: 0,
@@ -51,32 +47,13 @@ class CategoriesScreen extends StatelessWidget {
                   _buildCategoryCard(
                     context,
                     title: 'السوبرماركت',
-                    description: 'مقاضي البيت ومستلزمات يومية',
+                    description:
+                        'مقاضي البيت، المواد الغذائية، والمستلزمات اليومية',
                     icon: Icons.local_grocery_store_rounded,
-                    color: const Color(0xFF4CAF50),
+                    color: const Color(0xFF2E7D32),
                     storeCount: supermarketCount,
                     route: '/customer/stores/supermarket',
                     index: 1,
-                  ),
-                  _buildCategoryCard(
-                    context,
-                    title: 'الصيدليات',
-                    description: 'أدوية ومستلزمات طبية',
-                    icon: Icons.local_pharmacy_rounded,
-                    color: const Color(0xFF2196F3),
-                    storeCount: pharmacyCount,
-                    route: '/customer/stores/pharmacy',
-                    index: 2,
-                  ),
-                  _buildCategoryCard(
-                    context,
-                    title: 'الهدايا',
-                    description: 'هدايا وباقات ورد لكل المناسبات',
-                    icon: Icons.card_giftcard_rounded,
-                    color: const Color(0xFFE91E63),
-                    storeCount: giftCount,
-                    route: '/customer/stores/gift',
-                    index: 3,
                   ),
                 ]),
               ),

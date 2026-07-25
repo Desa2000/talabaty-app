@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../data/models/user_model.dart';
@@ -20,12 +21,35 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   String _area = '';
   String _street = '';
   String _phone = '';
+  double? _latitude;
+  double? _longitude;
+  bool _locating = false;
 
   @override
   void initState() {
     super.initState();
     final auth = context.read<AuthProvider>();
     _phone = auth.currentUser?.phone ?? '';
+    _loadCurrentLocation();
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   void _saveAddress() async {
@@ -34,6 +58,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     formState.save();
 
     final auth = context.read<AuthProvider>();
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فعّل الموقع وحدد إحداثيات صحيحة قبل الحفظ')),
+      );
+      return;
+    }
 
     final newAddress = AddressModel(
       id: const Uuid().v4(),
@@ -42,8 +72,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       area: _area,
       street: _street,
       landmark: '', // Optional for now
-      latitude: 15.5, // Mock lat
-      longitude: 32.5, // Mock lng
+      latitude: _latitude!,
+      longitude: _longitude!,
       phone: _phone,
     );
 

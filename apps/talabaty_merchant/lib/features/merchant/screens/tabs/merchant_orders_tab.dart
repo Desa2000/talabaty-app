@@ -38,73 +38,10 @@ class _MerchantOrdersTabState extends State<MerchantOrdersTab>
 
     final dataProvider = context.watch<DataProvider>();
 
-    // Fallback to 's1' if no merchant profile
-    final merchantId = auth.currentUser?.id ?? 's1';
-    List<OrderModel> orders = dataProvider.getOrdersForMerchant(merchantId);
+    final merchantId = auth.currentUser?.id;
+    if (merchantId == null) return const SizedBox();
+    final orders = dataProvider.getOrdersForMerchant(merchantId);
 
-    // Mock orders if empty for testing
-    if (orders.isEmpty) {
-      orders = [
-        OrderModel(
-          id: 'ord1',
-          customerId: 'c1',
-          storeId: 's1',
-          items: [],
-          subtotal: 4500,
-          deliveryFee: 0,
-          serviceFee: 0,
-          total: 4500,
-          status: OrderStatus.pending,
-          createdAt: DateTime.now().subtract(const Duration(minutes: 2)),
-          address: AddressModel(
-            id: 'mock',
-            title: 'mock',
-            city: '',
-            area: '',
-            street: 'بحري - الحلفايا',
-            landmark: '',
-            latitude: 15.6,
-            longitude: 32.5,
-            phone: '',
-          ),
-          customerLat: 15.6,
-          customerLng: 32.5,
-          storeLat: 15.6,
-          storeLng: 32.5,
-          paymentMethod: PaymentMethod.cashOnDelivery,
-          paymentStatus: PaymentStatus.unpaid,
-        ),
-        OrderModel(
-          id: 'ord2',
-          customerId: 'c2',
-          storeId: 's1',
-          items: [],
-          subtotal: 12000,
-          deliveryFee: 0,
-          serviceFee: 0,
-          total: 12000,
-          status: OrderStatus.preparing,
-          createdAt: DateTime.now().subtract(const Duration(minutes: 15)),
-          address: AddressModel(
-            id: 'mock',
-            title: 'mock',
-            city: '',
-            area: '',
-            street: 'الخرطوم - الرياض',
-            landmark: '',
-            latitude: 15.58,
-            longitude: 32.55,
-            phone: '',
-          ),
-          customerLat: 15.58,
-          customerLng: 32.55,
-          storeLat: 15.6,
-          storeLng: 32.5,
-          paymentMethod: PaymentMethod.cashOnDelivery,
-          paymentStatus: PaymentStatus.unpaid,
-        ),
-      ];
-    }
 
     final newOrders = orders
         .where((o) => o.status == OrderStatus.pending)

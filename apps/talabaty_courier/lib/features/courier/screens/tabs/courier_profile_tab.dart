@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:talabaty_courier/core/utils/directional_extensions.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -29,20 +28,20 @@ class CourierProfileTab extends StatelessWidget {
               vehicleType: VehicleType.motorcycle,
             ),
     );
-    final courierUser = dataProvider.users.firstWhere(
-      (u) => u.id == courier.userId,
-      orElse: () => dataProvider.users.isNotEmpty
-          ? dataProvider.users.first
-          : UserModel(
-              id: 'dummy',
-              name: 'سائق تجريبي',
-              email: '',
-              phone: '123',
-              password: '',
-              role: UserRole.courier,
-              createdAt: DateTime.now(),
-            ),
-    );
+    final courierUser =
+        auth.currentUser ??
+        dataProvider.users.firstWhere(
+          (u) => u.id == courierId,
+          orElse: () => UserModel(
+            id: 'dummy',
+            name: 'سائق',
+            email: '',
+            phone: '',
+            password: '',
+            role: UserRole.courier,
+            createdAt: DateTime.now(),
+          ),
+        );
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -261,7 +260,11 @@ class CourierProfileTab extends StatelessWidget {
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
       trailing: isLink
-          ? Icon(context.forwardIconIos, size: 16, color: Colors.grey)
+          ? const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: Colors.grey,
+            )
           : (subtitle != null
                 ? Text(
                     subtitle,

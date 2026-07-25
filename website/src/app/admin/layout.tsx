@@ -76,6 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/orders', label: 'الطلبات', icon: ShoppingBag },
     { href: '/admin/merchants', label: 'التجار والمتاجر', icon: Store },
     { href: '/admin/couriers', label: 'المناديب', icon: Bike },
+    { href: '/admin/live-map', label: 'العمليات المباشرة', icon: null },
     { href: '/admin/customers', label: 'العملاء', icon: Users },
     { href: '/admin/payments', label: 'المدفوعات وبنكك', icon: CreditCard },
     { href: '/admin/coverage', label: 'مناطق التغطية', icon: MapPin },
@@ -117,7 +118,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                {Icon ? (
+                  <Icon
+                    className={`w-5 h-5 ${
+                      isActive ? 'text-white' : 'text-gray-400'
+                    }`}
+                  />
+                ) : null}
                 <span>{item.label}</span>
               </Link>
             );

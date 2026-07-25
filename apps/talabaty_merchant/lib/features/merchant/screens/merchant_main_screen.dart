@@ -43,6 +43,7 @@ class _MerchantMainScreenState extends State<MerchantMainScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _currentIndex = index),
         child: Container(
+          height: 52,
           padding: const EdgeInsets.symmetric(vertical: 8),
           alignment: Alignment.center,
           child: AnimatedContainer(
@@ -106,69 +107,59 @@ class _MerchantMainScreenState extends State<MerchantMainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      extendBody: true,
+      extendBody: false,
       body: IndexedStack(index: _currentIndex, children: _tabs),
-      bottomNavigationBar:
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).padding.bottom > 24
-                    ? 12
-                    : MediaQuery.of(context).padding.bottom,
-              ),
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: AppColors.borderGray, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+          child: Container(
+            height: 68,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.borderGray, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(
-                      0,
-                      Icons.dashboard_rounded,
-                      Icons.dashboard_outlined,
-                      'الإحصائيات',
-                    ),
-                    _buildNavItem(
-                      1,
-                      Icons.receipt_long_rounded,
-                      Icons.receipt_long_outlined,
-                      'الطلبات',
-                    ),
-                    _buildNavItem(
-                      2,
-                      Icons.restaurant_menu_rounded,
-                      Icons.restaurant_menu,
-                      'المنيو',
-                    ),
-                    _buildNavItem(
-                      3,
-                      Icons.store_rounded,
-                      Icons.store_outlined,
-                      'المتجر',
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
-          ).animate().slideY(
-            begin: 1.0,
-            end: 0,
-            duration: 600.ms,
-            curve: Curves.easeOutExpo,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  0,
+                  Icons.dashboard_rounded,
+                  Icons.dashboard_outlined,
+                  'الإحصائيات',
+                ),
+                _buildNavItem(
+                  1,
+                  Icons.receipt_long_rounded,
+                  Icons.receipt_long_outlined,
+                  'الطلبات',
+                ),
+                _buildNavItem(
+                  2,
+                  Icons.restaurant_menu_rounded,
+                  Icons.restaurant_menu,
+                  'المنيو',
+                ),
+                _buildNavItem(
+                  3,
+                  Icons.store_rounded,
+                  Icons.store_outlined,
+                  'المتجر',
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
     );
   }
 }

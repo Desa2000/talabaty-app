@@ -52,7 +52,9 @@ class NotificationService {
         },
       );
 
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
 
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('Got a message whilst in the foreground: ${message.data}');
@@ -81,11 +83,7 @@ class NotificationService {
       _lastRegisteredToken = token;
       await ApiClient().dio.post(
         '/devices/token',
-        data: {
-          'token': token,
-          'platform': 'ANDROID',
-          'appType': appType,
-        },
+        data: {'token': token, 'platform': 'ANDROID', 'appType': appType},
       );
       debugPrint('FCM token registered to backend [$appType]');
     } catch (e) {
@@ -98,10 +96,7 @@ class NotificationService {
     try {
       final token = _lastRegisteredToken ?? await _fcm.getToken();
       if (token != null && token.isNotEmpty) {
-        await ApiClient().dio.delete(
-          '/devices/token',
-          data: {'token': token},
-        );
+        await ApiClient().dio.delete('/devices/token', data: {'token': token});
         debugPrint('FCM token unregistered from backend');
       }
     } catch (e) {

@@ -122,6 +122,13 @@ class OrderApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> courierRejectOffer(String orderId) async {
+    final response = await _apiClient.dio.post(
+      '/orders/$orderId/courier/reject',
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> courierPickupOrder(String orderId) async {
     final response = await _apiClient.dio.post('/orders/$orderId/picked-up');
     return response.data as Map<String, dynamic>;

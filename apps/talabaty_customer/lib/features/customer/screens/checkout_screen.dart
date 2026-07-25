@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,7 +13,7 @@ import '../../../core/constants/enums.dart';
 import '../../../core/services/delivery_fee_service.dart';
 import '../../../data/services/order_api_service.dart';
 import '../../../data/models/user_model.dart';
-import '../../../data/mock/mock_data.dart';
+import '../../../data/models/store_model.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -28,7 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final OrderApiService _orderApiService = OrderApiService();
   bool _isLoading = false;
 
-  AddressModel _selectedAddress = MockData.addressBahri;
+  AddressModel? _selectedAddress;
   double? _userLat;
   double? _userLng;
 
@@ -68,16 +69,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         setState(() {
           _userLat = pos.latitude;
           _userLng = pos.longitude;
+          final current = _selectedAddress;
           _selectedAddress = AddressModel(
-            id: _selectedAddress.id,
-            title: _selectedAddress.title,
-            city: _selectedAddress.city,
-            area: _selectedAddress.area,
-            street: _selectedAddress.street,
-            landmark: _selectedAddress.landmark,
+            id: current?.id ?? 'current-location',
+            title: current?.title ?? 'الموقع الحالي',
+            city: current?.city ?? 'الخرطوم',
+            area: current?.area ?? '',
+            street: current?.street ?? 'الموقع الحالي',
+            landmark: current?.landmark ?? '',
             latitude: pos.latitude,
             longitude: pos.longitude,
-            phone: _selectedAddress.phone,
+            phone: current?.phone ?? '',
           );
         });
       }
@@ -94,7 +96,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = context.read<CartProvider>();
     final dataProvider = context.read<DataProvider>();
 
-    if (cart.items.isEmpty) return;
+    if (_selectedPayment == PaymentMethod.bankak) {
+      final last4 = _bankakRefController.text.trim();
+      if (!RegExp(r'^\d{4}$').hasMatch(last4)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'يرجى إدخال آخر 4 أرقام من رقم عملية بنكك بشكل صحيح (4 أرقام فقط)',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
 
     setState(() => _isLoading = true);
 
@@ -106,14 +121,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           )
           .toList();
 
+      final selectedAddress = _selectedAddress;
+      if (selectedAddress == null ||
+          !selectedAddress.latitude.isFinite ||
+          !selectedAddress.longitude.isFinite ||
+          (selectedAddress.latitude == 0 && selectedAddress.longitude == 0)) {
+        throw Exception('حدد موقع توصيل صحيح من الخريطة أو فعّل الموقع');
+      }
       final deliveryAddressStr =
-          '${_selectedAddress.area} - ${_selectedAddress.street}';
-      final custLat = _selectedAddress.latitude != 0
-          ? _selectedAddress.latitude
-          : (_userLat ?? 15.5006);
-      final custLng = _selectedAddress.longitude != 0
-          ? _selectedAddress.longitude
-          : (_userLng ?? 32.5599);
+          '${selectedAddress.area} - ${selectedAddress.street}';
+      final custLat = selectedAddress.latitude;
+      final custLng = selectedAddress.longitude;
 
       final res = await _orderApiService.createOrder(
         storeId: storeId,
@@ -192,19 +210,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final storeId = cart.items.first.product.storeId;
-    final store = dataProvider.stores.firstWhere(
-      (s) => s.id == storeId,
-      orElse: () => dataProvider.stores.isNotEmpty
-          ? dataProvider.stores.first
-          : MockData.mockStores.first,
-    );
+    StoreModel? store;
+    for (final candidate in dataProvider.stores) {
+      if (candidate.id == storeId) {
+        store = candidate;
+        break;
+      }
+    }
+    if (store == null) {
+      return const Scaffold(
+        body: Center(child: Text('تعذر تحميل بيانات المتجر. حاول مرة أخرى.')),
+      );
+    }
 
-    double custLat = _selectedAddress.latitude != 0
-        ? _selectedAddress.latitude
-        : (_userLat ?? 15.5006);
-    double custLng = _selectedAddress.longitude != 0
-        ? _selectedAddress.longitude
-        : (_userLng ?? 32.5599);
+    final selectedAddress = _selectedAddress;
+    final custLat = selectedAddress?.latitude ?? _userLat;
+    final custLng = selectedAddress?.longitude ?? _userLng;
+    if (custLat == null || custLng == null) {
+      return const Scaffold(
+        body: Center(child: Text('حدد موقع التوصيل أو فعّل خدمة الموقع.')),
+      );
+    }
 
     final distance = DeliveryFeeService.distanceKm(
       custLat,
@@ -215,7 +241,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final deliveryFee = store.deliveryFee > 0
         ? store.deliveryFee
         : DeliveryFeeService.deliveryFee(distance);
-    final serviceFee = DeliveryFeeService.serviceFee(cart.totalPrice);
+    const serviceFee = 0.0;
     final total = cart.totalPrice + deliveryFee;
 
     return Scaffold(
@@ -263,9 +289,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         area: 'الرياض',
                         street: result,
                         landmark: '',
-                        latitude: _userLat ?? 15.5006,
-                        longitude: _userLng ?? 32.5599,
-                        phone: '0912345678',
+                        latitude: _userLat ?? 0,
+                        longitude: _userLng ?? 0,
+                        phone: context.read<AuthProvider>().currentUser?.phone ?? '',
                       );
                     });
                   }
@@ -316,7 +342,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _selectedAddress.street,
+                              _selectedAddress?.street ?? 'اضغط لتحديد موقع التوصيل',
                               style: GoogleFonts.cairo(
                                 color: AppColors.textSecondary,
                                 fontSize: 13,
@@ -364,21 +390,80 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               if (_selectedPayment == PaymentMethod.bankak) ...[
                 const SizedBox(height: 14),
-                TextField(
-                  controller: _bankakRefController,
-                  decoration: InputDecoration(
-                    hintText: 'أدخل رقم العملية أو إشعار بنكك (اختياري)',
-                    hintStyle: GoogleFonts.cairo(
-                      color: Colors.grey.shade400,
-                      fontSize: 13,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide(color: Colors.blue.shade200),
-                    ),
-                    contentPadding: const EdgeInsets.all(16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'رقم الحساب: 2391651',
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            '${total.toInt()} ج.س',
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryColor,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'اسم صاحب الحساب: المدثر عامر الفاضل',
+                        style: GoogleFonts.cairo(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _bankakRefController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                        decoration: InputDecoration(
+                          labelText: 'آخر 4 أرقام من رقم العملية',
+                          hintText: 'أدخل 4 أرقام فقط (مطلوب)',
+                          labelStyle: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          hintStyle: GoogleFonts.cairo(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          prefixIcon: const Icon(
+                            Icons.pin_outlined,
+                            color: Colors.blue,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.blue.shade300),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -520,8 +605,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           deliveryFee,
                           serviceFee,
                           total,
-                          store.latitude,
-                          store.longitude,
+                          store!.latitude,
+                          store!.longitude,
                         ),
                   child: _isLoading
                       ? const SizedBox(
@@ -533,7 +618,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         )
                       : Text(
-                          'تأكيد وإرسال الطلب',
+                          _selectedPayment == PaymentMethod.bankak
+                              ? 'إرسال للتحقق'
+                              : 'تأكيد وإرسال الطلب',
                           style: GoogleFonts.cairo(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,

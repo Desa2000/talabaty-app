@@ -29,25 +29,13 @@ class StoresScreen extends StatelessWidget {
       title = 'المطاعم';
       subtitle = 'أشهى المأكولات من أفضل المطاعم';
       categoryIcon = Icons.restaurant_rounded;
-      categoryColor = const Color(0xFFFF8C00);
-    } else if (categoryType == 'supermarket') {
+      categoryColor = const Color(0xFFFF5722);
+    } else {
       targetType = StoreType.supermarket;
       title = 'السوبرماركت';
-      subtitle = 'كل ما تحتاجه لمنزلك';
+      subtitle = 'كل ما تحتاجه لمنزلك ومستلزماتك اليومية';
       categoryIcon = Icons.local_grocery_store_rounded;
-      categoryColor = const Color(0xFF4CAF50);
-    } else if (categoryType == 'pharmacy') {
-      targetType = StoreType.pharmacy;
-      title = 'الصيدليات';
-      subtitle = 'أدوية ومستلزمات طبية';
-      categoryIcon = Icons.local_pharmacy_rounded;
-      categoryColor = const Color(0xFF2196F3);
-    } else if (categoryType == 'gift') {
-      targetType = StoreType.gift;
-      title = 'الهدايا';
-      subtitle = 'هدايا وباقات ورد لكل المناسبات';
-      categoryIcon = Icons.card_giftcard_rounded;
-      categoryColor = const Color(0xFFE91E63);
+      categoryColor = const Color(0xFF2E7D32);
     }
 
     final stores = dataProvider.stores

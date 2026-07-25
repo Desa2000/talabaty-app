@@ -415,8 +415,6 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen>
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
                                     children: [
                                       // Price
                                       Row(
@@ -441,31 +439,119 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen>
                                               child: Text(
                                                 '${p.price}',
                                                 style: const TextStyle(
-                                                  color: Colors.grey,
-                                                  fontSize: 12,
                                                   decoration: TextDecoration
                                                       .lineThrough,
                                                   fontFamily: 'Cairo',
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
                                                 ),
                                               ),
                                             ),
                                           ],
                                         ],
                                       ),
-                                      // Add Button
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primaryColor
-                                              .withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                      InkWell(
+                                        onTap: () {
+                                          final cart = context
+                                              .read<CartProvider>();
+                                          if (cart.isFromDifferentStore(p)) {
+                                            showDialog(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                title: const Text(
+                                                  'متجر مختلف',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Cairo',
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                content: const Text(
+                                                  'طلباتك الحالية من متجر آخر. هل تريد تفريغ السلة والبدء من هذا المتجر؟',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Cairo',
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(ctx),
+                                                    child: const Text(
+                                                      'إلغاء',
+                                                      style: TextStyle(
+                                                        fontFamily: 'Cairo',
+                                                        color: Colors.grey,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    style:
+                                                        ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              AppColors
+                                                                  .primaryColor,
+                                                        ),
+                                                    onPressed: () {
+                                                      Navigator.pop(ctx);
+                                                      cart.addProduct(
+                                                        p,
+                                                        forceClearStoreMismatch:
+                                                            true,
+                                                      );
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'تم تفريغ السلة وإضافة المنتج بنجاح',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                    child: const Text(
+                                                      'تفريغ وإضافة',
+                                                      style: TextStyle(
+                                                        fontFamily: 'Cairo',
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          cart.addProduct(p);
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'تم إضافة ${p.name} إلى السلة',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryColor
+                                                .withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.add_rounded,
-                                          color: AppColors.primaryColor,
-                                          size: 20,
+                                          child: const Icon(
+                                            Icons.add_rounded,
+                                            color: AppColors.primaryColor,
+                                            size: 20,
+                                          ),
                                         ),
                                       ),
                                     ],
