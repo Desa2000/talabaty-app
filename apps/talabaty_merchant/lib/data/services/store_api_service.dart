@@ -110,7 +110,7 @@ class StoreApiService {
   /// Update store open/closed status via backend
   Future<void> updateStoreStatus(String storeId, bool isOpen) async {
     try {
-      await _apiClient.dio.patch('/stores/$storeId', data: {'isOpen': isOpen});
+      await _apiClient.dio.put('/merchant/stores/$storeId', data: {'isOpen': isOpen});
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException
@@ -121,8 +121,8 @@ class StoreApiService {
   /// Update store profile fields via backend
   Future<void> updateStore(StoreModel store) async {
     try {
-      await _apiClient.dio.patch(
-        '/stores/${store.id}',
+      await _apiClient.dio.put(
+        '/merchant/stores/${store.id}',
         data: {
           'name': store.name,
           'latitude': store.latitude,
