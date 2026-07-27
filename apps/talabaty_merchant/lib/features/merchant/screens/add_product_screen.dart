@@ -248,9 +248,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.currentUser;
-    if (user == null) return;
-
-    final String storeId = 'store_${user.id}';
+    final storeId = user?.merchantStoreId;
+    if (storeId == null || storeId.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر تحديد المتجر الحقيقي لهذا الحساب، أعد تسجيل الدخول'),
+        ),
+      );
+      return;
+    }
 
     final product = ProductModel(
       id: _uuid.v4(),

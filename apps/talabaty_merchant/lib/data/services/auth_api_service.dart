@@ -25,6 +25,7 @@ class AuthApiService {
       password: '', // Password is never returned
       role: roleVal,
       profileImage: json['profileImage'],
+      merchantStoreId: json['storeId']?.toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),

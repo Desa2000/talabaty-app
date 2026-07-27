@@ -28,6 +28,25 @@ const hashToken = (token: string): string => {
   return crypto.createHash('sha256').update(token).digest('hex');
 };
 
+const getPrimaryMerchantStoreId = async (
+  userId: string,
+  role: string
+): Promise<string | null> => {
+  if (role !== 'MERCHANT') return null;
+
+  const merchantProfile = await prisma.merchantProfile.findUnique({
+    where: { userId },
+    select: {
+      stores: {
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+
+  return merchantProfile?.stores?.[0]?.id ?? null;
+};
+
 // Validation schemas
 const registerCustomerSchema = z.object({
   name: z.string().min(2),
@@ -192,8 +211,17 @@ export const registerMerchant = async (req: Request, res: Response) => {
       },
     });
 
+    const storeId = await getPrimaryMerchantStoreId(user.id, user.role);
+
     return res.status(201).json({
-      user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        storeId,
+      },
       accessToken,
       refreshToken,
     });
@@ -343,6 +371,8 @@ export const login = async (req: Request, res: Response) => {
       },
     });
 
+    const storeId = await getPrimaryMerchantStoreId(user.id, user.role);
+
     return res.json({
       user: {
         id: user.id,
@@ -350,6 +380,7 @@ export const login = async (req: Request, res: Response) => {
         phone: user.phone,
         email: user.email,
         role: user.role,
+        storeId,
         forcePasswordChange: user.forcePasswordChange,
       },
       accessToken,
@@ -512,7 +543,8 @@ export const getMe = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json(user);
+    const storeId = await getPrimaryMerchantStoreId(user.id, user.role);
+    return res.json({ ...user, storeId });
   } catch (error: any) {
     return res.status(500).json({ error: 'Failed to retrieve profile' });
   }
@@ -690,6 +722,8 @@ export const otpLogin = async (req: Request, res: Response) => {
       },
     });
 
+    const storeId = await getPrimaryMerchantStoreId(user.id, user.role);
+
     return res.json({
       exists: true,
       user: {
@@ -698,6 +732,7 @@ export const otpLogin = async (req: Request, res: Response) => {
         phone: user.phone,
         email: user.email,
         role: user.role,
+        storeId,
       },
       accessToken,
       refreshToken,

@@ -72,6 +72,7 @@ class UserModel {
   final String? profileImage;
   final DateTime createdAt;
   final String? fcmToken;
+  final String? merchantStoreId;
   final List<AddressModel>? savedAddresses;
 
   UserModel({
@@ -84,6 +85,7 @@ class UserModel {
     this.profileImage,
     required this.createdAt,
     this.fcmToken,
+    this.merchantStoreId,
     this.savedAddresses,
   });
 
@@ -101,6 +103,7 @@ class UserModel {
       profileImage: json['profileImage'],
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       fcmToken: json['fcmToken'],
+      merchantStoreId: json['storeId'] ?? json['merchantStoreId'],
       savedAddresses: json['savedAddresses'] != null
           ? (json['savedAddresses'] as List)
                 .map((i) => AddressModel.fromJson(i))
@@ -120,6 +123,7 @@ class UserModel {
       'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
       'fcmToken': fcmToken,
+      'storeId': merchantStoreId,
       'savedAddresses': savedAddresses?.map((e) => e.toJson()).toList(),
     };
   }

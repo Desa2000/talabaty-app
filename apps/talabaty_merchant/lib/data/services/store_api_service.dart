@@ -144,6 +144,89 @@ class StoreApiService {
     }
   }
 
+
+  Map<String, dynamic> _productPayload(ProductModel product) {
+    final data = <String, dynamic>{
+      'storeId': product.storeId,
+      'categoryName': product.category,
+      'nameAr': product.name,
+      'descriptionAr': product.description,
+      'price': product.price,
+      'isAvailable': product.isAvailable,
+      'stock': product.stockQuantity,
+      'unit': 'piece',
+      'preparationNotes':
+          'زمن التحضير التقريبي: ${product.preparationTimeMinutes} دقيقة',
+    };
+
+    if (product.discountPrice != null && product.discountPrice! > 0) {
+      data['discountPrice'] = product.discountPrice;
+    }
+
+    if (product.image.startsWith('http://') ||
+        product.image.startsWith('https://')) {
+      data['imageUrl'] = product.image;
+    }
+
+    return data;
+  }
+
+  Future<ProductModel> createProduct(ProductModel product) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/merchant/products',
+        data: _productPayload(product),
+      );
+      final saved = _parseProduct(response.data as Map<String, dynamic>);
+      return saved.copyWith(
+        category: product.category,
+        lowStockThreshold: product.lowStockThreshold,
+        preparationTimeMinutes: product.preparationTimeMinutes,
+        isFeatured: product.isFeatured,
+        allowCustomerNotes: product.allowCustomerNotes,
+        optionGroups: product.optionGroups,
+        addOns: product.addOns,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل إضافة المنتج');
+    }
+  }
+
+  Future<ProductModel> updateProduct(ProductModel product) async {
+    try {
+      final response = await _apiClient.dio.put(
+        '/merchant/products/${product.id}',
+        data: _productPayload(product),
+      );
+      final saved = _parseProduct(response.data as Map<String, dynamic>);
+      return saved.copyWith(
+        category: product.category,
+        lowStockThreshold: product.lowStockThreshold,
+        preparationTimeMinutes: product.preparationTimeMinutes,
+        isFeatured: product.isFeatured,
+        allowCustomerNotes: product.allowCustomerNotes,
+        optionGroups: product.optionGroups,
+        addOns: product.addOns,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل تعديل المنتج');
+    }
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    try {
+      await _apiClient.dio.delete('/merchant/products/$productId');
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'فشل حذف المنتج');
+    }
+  }
+
   /// Upload a product image to backend and return the hosted URL
   Future<String> uploadProductImage(String filePath) async {
     try {

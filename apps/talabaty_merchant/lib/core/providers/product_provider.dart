@@ -73,13 +73,13 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // Products are saved via the Merchant's AddProductScreen which calls backend directly.
-      // Here we just update local state optimistically.
+      final saved = await _storeApiService.createProduct(product);
       if (_isDisposed) return;
-      _products.insert(0, product);
+      _products.insert(0, saved);
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
+      rethrow;
     } finally {
       if (!_isDisposed) {
         _isLoading = false;
@@ -93,14 +93,16 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      final saved = await _storeApiService.updateProduct(product);
       if (_isDisposed) return;
       final index = _products.indexWhere((p) => p.id == product.id);
       if (index != -1) {
-        _products[index] = product;
+        _products[index] = saved;
       }
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
+      rethrow;
     } finally {
       if (!_isDisposed) {
         _isLoading = false;
@@ -114,12 +116,13 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // Backend deletion is done in the screen via ProductApiService / StoreApiService.
+      await _storeApiService.deleteProduct(productId);
       if (_isDisposed) return;
       _products.removeWhere((p) => p.id == productId);
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
+      rethrow;
     } finally {
       if (!_isDisposed) {
         _isLoading = false;
@@ -131,17 +134,18 @@ class ProductProvider extends ChangeNotifier {
   Future<void> toggleAvailability(String productId, bool isAvailable) async {
     _error = null;
     try {
-      // Backend availability toggling is done via REST API in the screen.
-      if (_isDisposed) return;
       final index = _products.indexWhere((p) => p.id == productId);
-      if (index != -1) {
-        _products[index] = _products[index].copyWith(isAvailable: isAvailable);
-        notifyListeners();
-      }
+      if (index == -1) return;
+      final updated = _products[index].copyWith(isAvailable: isAvailable);
+      final saved = await _storeApiService.updateProduct(updated);
+      if (_isDisposed) return;
+      _products[index] = saved;
+      notifyListeners();
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
       notifyListeners();
+      rethrow;
     }
   }
 
@@ -149,20 +153,19 @@ class ProductProvider extends ChangeNotifier {
     _error = null;
     try {
       final index = _products.indexWhere((p) => p.id == productId);
-      if (index != -1) {
-        int newQuantity = _products[index].stockQuantity + quantityChange;
-        if (newQuantity < 0) newQuantity = 0;
-        // Backend stock update is done via REST API in the screen.
-        if (_isDisposed) return;
-        _products[index] = _products[index].copyWith(
-          stockQuantity: newQuantity,
-        );
-        notifyListeners();
-      }
+      if (index == -1) return;
+      var newQuantity = _products[index].stockQuantity + quantityChange;
+      if (newQuantity < 0) newQuantity = 0;
+      final updated = _products[index].copyWith(stockQuantity: newQuantity);
+      final saved = await _storeApiService.updateProduct(updated);
+      if (_isDisposed) return;
+      _products[index] = saved;
+      notifyListeners();
     } catch (e) {
       if (_isDisposed) return;
       _error = e.toString();
       notifyListeners();
+      rethrow;
     }
   }
 

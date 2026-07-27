@@ -322,6 +322,7 @@ class AuthProvider extends ChangeNotifier {
       profileImage: _currentUser!.profileImage,
       createdAt: _currentUser!.createdAt,
       fcmToken: _currentUser!.fcmToken,
+      merchantStoreId: _currentUser!.merchantStoreId,
       savedAddresses: updatedAddresses,
     );
 
