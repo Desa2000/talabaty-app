@@ -68,6 +68,10 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
+  Future<String> uploadProductImage(String filePath) async {
+    return _storeApiService.uploadProductImage(filePath);
+  }
+
   Future<void> addProduct(ProductModel product) async {
     _isLoading = true;
     _error = null;

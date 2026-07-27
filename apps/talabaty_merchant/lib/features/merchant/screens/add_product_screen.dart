@@ -242,7 +242,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  void _saveProduct() async {
+  Future<void> _saveProduct() async {
     if (_formKey.currentState?.validate() != true) return;
     _formKey.currentState?.save();
 
@@ -259,36 +259,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    final product = ProductModel(
-      id: _uuid.v4(),
-      storeId: storeId,
-      name: _name,
-      description: _description,
-      image:
-          _imageFile?.path ??
-          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400',
-      category: _category,
-      price: _price,
-      discountPrice: _discountPrice,
-      stockQuantity: _stockQuantity,
-      lowStockThreshold: _lowStockThreshold,
-      preparationTimeMinutes: _prepTime,
-      isAvailable: _isAvailable,
-      isFeatured: _isFeatured,
-      allowCustomerNotes: _allowCustomerNotes,
-      optionGroups: _optionGroups,
-      addOns: _addOns,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    try {
+      final productProvider = context.read<ProductProvider>();
+      var imageUrl =
+          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400';
 
-    context.read<ProductProvider>().addProduct(product).then((_) {
+      if (_imageFile != null) {
+        imageUrl = await productProvider.uploadProductImage(_imageFile!.path);
+      }
+
+      final product = ProductModel(
+        id: _uuid.v4(),
+        storeId: storeId,
+        name: _name,
+        description: _description,
+        image: imageUrl,
+        category: _category,
+        price: _price,
+        discountPrice: _discountPrice,
+        stockQuantity: _stockQuantity,
+        lowStockThreshold: _lowStockThreshold,
+        preparationTimeMinutes: _prepTime,
+        isAvailable: _isAvailable,
+        isFeatured: _isFeatured,
+        allowCustomerNotes: _allowCustomerNotes,
+        optionGroups: _optionGroups,
+        addOns: _addOns,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await productProvider.addProduct(product);
+
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حفظ المنتج بنجاح')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ المنتج والصورة بنجاح')),
+      );
       context.pop();
-    });
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل حفظ المنتج: $e')),
+      );
+    }
   }
 
   @override

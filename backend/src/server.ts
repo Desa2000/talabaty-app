@@ -1,6 +1,10 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 import { Server } from 'socket.io';
 import { config } from './config';
 import {
@@ -147,6 +151,38 @@ const apiRateLimiter = (limit: number, windowMs: number) =>
 const app = express();
 export const server = http.createServer(app);
 
+const productUploadDir = path.resolve(process.cwd(), 'uploads/products');
+fs.mkdirSync(productUploadDir, { recursive: true });
+
+const productImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, productUploadDir),
+  filename: (_req, file, cb) => {
+    const safeExt = path.extname(file.originalname || '').toLowerCase();
+    const ext = ['.jpg', '.jpeg', '.png', '.webp'].includes(safeExt)
+      ? safeExt
+      : '.jpg';
+    cb(null, `product-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`);
+  },
+});
+
+const productImageUpload = multer({
+  storage: productImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ]);
+
+    if (!allowed.has(file.mimetype)) {
+      return cb(new Error('نوع الصورة غير مدعوم'));
+    }
+
+    cb(null, true);
+  },
+});
+
 // CORS Configuration
 app.use(
   cors({
@@ -159,6 +195,8 @@ app.use(
 // Body Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Health Check
 app.get('/', (req, res) => {
@@ -188,6 +226,27 @@ app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', authenticate, getMe);
 app.post('/api/devices/token', authenticate, registerDeviceToken);
 app.delete('/api/devices/token', authenticate, unregisterDeviceToken);
+
+// Authenticated product image upload for Merchant Android app.
+app.post(
+  '/api/upload',
+  authenticate,
+  authorizeRoles('MERCHANT', 'ADMIN', 'SUPER_ADMIN'),
+  productImageUpload.single('file'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'ملف الصورة مطلوب' });
+    }
+
+    const publicBaseUrl = (
+      process.env.PUBLIC_API_URL || 'https://api.mytalabaty.com'
+    ).replace(/\/+$/, '');
+
+    return res.status(201).json({
+      url: `${publicBaseUrl}/uploads/products/${req.file.filename}`,
+    });
+  }
+);
 
 // 2. Store Routes
 app.get('/api/stores', getStores);

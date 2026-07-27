@@ -262,35 +262,65 @@ class _EditProductScreenState extends State<EditProductScreen> {
     );
   }
 
-  void _saveProduct() {
+  Future<void> _saveProduct() async {
     if (_formKey.currentState?.validate() != true) return;
     _formKey.currentState?.save();
 
-    final updatedProduct = widget.product.copyWith(
-      name: _name,
-      description: _description,
-      category: _category,
-      price: _price,
-      discountPrice: _discountPrice,
-      stockQuantity: _stockQuantity,
-      lowStockThreshold: _lowStockThreshold,
-      preparationTimeMinutes: _prepTime,
-      isAvailable: _isAvailable,
-      isFeatured: _isFeatured,
-      allowCustomerNotes: _allowCustomerNotes,
-      optionGroups: _optionGroups,
-      addOns: _addOns,
-      updatedAt: DateTime.now(),
-      image: _imageFile != null ? _imageFile!.path : widget.product.image,
-    );
+    try {
+      final productProvider = context.read<ProductProvider>();
+      var imageUrl = widget.product.image;
 
-    context.read<ProductProvider>().updateProduct(updatedProduct).then((_) {
+      if (_imageFile != null) {
+        imageUrl = await productProvider.uploadProductImage(_imageFile!.path);
+      }
+
+      final updatedProduct = widget.product.copyWith(
+        name: _name,
+        description: _description,
+        category: _category,
+        price: _price,
+        discountPrice: _discountPrice,
+        stockQuantity: _stockQuantity,
+        lowStockThreshold: _lowStockThreshold,
+        preparationTimeMinutes: _prepTime,
+        isAvailable: _isAvailable,
+        isFeatured: _isFeatured,
+        allowCustomerNotes: _allowCustomerNotes,
+        optionGroups: _optionGroups,
+        addOns: _addOns,
+        updatedAt: DateTime.now(),
+        image: imageUrl,
+      );
+
+      await productProvider.updateProduct(updatedProduct);
+
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم تعديل المنتج بنجاح')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تعديل المنتج بنجاح')),
+      );
       context.pop();
-    });
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل تعديل المنتج: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    try {
+      await context.read<ProductProvider>().deleteProduct(widget.product.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حذف المنتج بنجاح')),
+      );
+      context.pop();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل حذف المنتج: $e')),
+      );
+    }
   }
 
   @override
@@ -598,15 +628,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               SizedBox(
                 width: double.infinity,
                 child: TextButton.icon(
-                  onPressed: () {
-                    context.read<ProductProvider>().deleteProduct(
-                      widget.product.id,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم حذف المنتج بنجاح')),
-                    );
-                    context.pop();
-                  },
+                  onPressed: _deleteProduct,
                   icon: const Icon(Icons.delete, color: Colors.red),
                   label: const Text(
                     'حذف المنتج',
