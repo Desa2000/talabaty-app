@@ -20,7 +20,7 @@ export class DispatchService {
       .slice(0, 20);
 
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`
+      await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${`dispatch:${orderId}`})
         )
@@ -105,7 +105,7 @@ export class DispatchService {
     );
 
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`
+      await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${`dispatch:${orderId}`})
         )

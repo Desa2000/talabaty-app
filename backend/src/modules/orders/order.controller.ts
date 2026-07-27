@@ -902,7 +902,7 @@ export const courierAcceptOrder = async (req: Request, res: Response) => {
 
     const result = await prisma.$transaction(async (tx) => {
       // Serialize dispatch/accept operations for this order.
-      await tx.$queryRaw`
+      await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${`dispatch:${id}`})
         )
@@ -1116,7 +1116,7 @@ export const courierRejectOffer = async (req: Request, res: Response) => {
     const result = await prisma.$transaction(async (tx) => {
       // Serialize reject / accept / timeout / next-offer operations
       // for this specific order.
-      await tx.$queryRaw`
+      await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${`dispatch:${id}`})
         )
